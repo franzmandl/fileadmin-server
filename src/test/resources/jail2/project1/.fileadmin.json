@@ -1,0 +1,14 @@
+{
+  "discriminator": "SettingsVersion1",
+  "tickets": {
+    "discriminator": "TicketsVersion1"
+  },
+  "children": {
+    "discriminator": "SettingsVersion1",
+    "newInodeTemplate": {
+      "discriminator": "NewInodeVersion1",
+      "basename": "<now> - .txt",
+      "isFile": false
+    }
+  }
+}

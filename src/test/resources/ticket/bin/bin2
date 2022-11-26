@@ -1,0 +1,22 @@
+#!/bin/sh
+
+evaluate=true
+year="$1" && shift
+month="$1" && shift
+day="$1" && shift
+date="$year-$month-$day"
+
+while [ $# != 0 ]; do
+  evaluate=false
+  case "$2" in
+    years|months|days|weeks) date="$(date "+%Y-%m-%d" -d "$1 $2 $date")" && shift ;;
+    *) echo "[$0:${LINENO-}][ERROR] Not an action '$1'." >&2; exit 1 ;;
+  esac
+  shift
+done
+
+if "$evaluate"; then
+  echo "$date"
+else
+  echo "bin(expr $date)"
+fi

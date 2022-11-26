@@ -1,0 +1,8 @@
+1space Enim sed faucibus turpis in eu mi.
+2space  Ut placerat orci nulla pellentesque.
+3space   Dui id ornare arcu odio ut sem nulla pharetra diam.
+4space    Facilisis mauris sit amet massa vitae tortor condimentum lacinia.
+1tab	Nisi vitae suscipit tellus mauris a diam maecenas.
+2tab		Libero nunc consequat interdum varius.
+3tab			Vel pharetra vel turpis nunc eget lorem dolor sed viverra.
+4tab				Nulla facilisi morbi tempus iaculis urna id volutpat lacus laoreet.

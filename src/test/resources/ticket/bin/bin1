@@ -1,0 +1,4 @@
+#!/bin/sh
+[ "$1" = "arg11" ] || exit 1; shift
+[ "$1" = "arg12" ] || exit 1; shift
+echo "2020-03-02"
