@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ServerKt tickets" type="JetRunConfigurationType">
+    <option name="MAIN_CLASS_NAME" value="com.franzmandl.fileadmin.ServerKt" />
+    <module name="fileadmin-server.main" />
+    <option name="PROGRAM_PARAMETERS" value="tickets ./src/test/resources/jail2 ./src/test/resources/ticket/bin 2020-03-01 2020-03-15" />
+    <shortenClasspath name="NONE" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

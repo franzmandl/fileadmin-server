@@ -1,0 +1,12 @@
+{
+  "discriminator": "SettingsVersion1",
+  "children": {
+    "discriminator": "SettingsVersion1",
+    "basenameCursorPosition": 10,
+    "newInodeTemplate": {
+      "discriminator": "NewInodeVersion1",
+      "basename": "<now>.txt",
+      "isFile": true
+    }
+  }
+}

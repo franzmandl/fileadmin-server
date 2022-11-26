@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="900" height="700" xmlns="http://www.w3.org/2000/svg">
+   <circle cx="450" cy="350" r="200" fill="white" stroke="black" stroke-width="10"/>
+   <line x1="0" y1="0" x2="900" y2="700" stroke="red" stroke-width="10"/>
+   <line x1="0" y1="700" x2="900" y2="0" stroke="green" stroke-width="10"/>
+</svg>

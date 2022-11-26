@@ -1,0 +1,20 @@
+0space Quam id leo in vitae turpis massa sed elementum tempus.
+ 1space Enim sed faucibus turpis in eu mi.
+  2space Ut placerat orci nulla pellentesque.
+   3space Dui id ornare arcu odio ut sem nulla pharetra diam.
+    4space Facilisis mauris sit amet massa vitae tortor condimentum lacinia.
+0tab Diam sollicitudin tempor id eu.
+	1tab Nisi vitae suscipit tellus mauris a diam maecenas.
+		2tab Libero nunc consequat interdum varius.
+			3tab Vel pharetra vel turpis nunc eget lorem dolor sed viverra.
+				4tab Nulla facilisi morbi tempus iaculis urna id volutpat lacus laoreet.
++ plus Auctor urna nunc id cursus metus aliquam eleifend mi.
+  - minus Euismod elementum nisi quis eleifend quam.
+    = equals Turpis egestas maecenas pharetra convallis posuere.
+  > greater than In fermentum et sollicitudin ac orci. Elit at imperdiet dui accumsan sit amet nulla.
+~ tilde Egestas tellus rutrum tellus pellentesque eu tincidunt tortor aliquam nulla.
+  [ ] checkbox false Viverra nam [x] libero justo laoreet sit amet cursus.
+[x] checkbox true Vestibulum lectus mauris ultrices [ ] eros in cursus turpis.
+(/) check Quam elementum pulvinar etiam non.
+(?) question Sit amet luctus venenatis lectus magna.
+(x) cross Enim praesent elementum facilisis leo vel fringilla est.

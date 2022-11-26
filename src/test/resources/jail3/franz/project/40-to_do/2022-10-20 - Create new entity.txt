@@ -1,0 +1,3 @@
+[x] Create model
+[ ] Create controller (?)
+[ ] Create view

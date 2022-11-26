@@ -1,0 +1,6 @@
+{
+  "discriminator": "SettingsVersion1",
+  "tickets": {
+    "discriminator": "TicketsVersion1"
+  }
+}

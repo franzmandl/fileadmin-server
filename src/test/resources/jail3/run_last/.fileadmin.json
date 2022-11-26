@@ -1,0 +1,6 @@
+{
+  "discriminator": "SettingsVersion1",
+  "runLast": {
+    "discriminator": "RunLastVersion1"
+  }
+}
