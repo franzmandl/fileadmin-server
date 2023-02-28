@@ -1,8 +1,7 @@
 package com.franzmandl.fileadmin.security
 
-import com.franzmandl.fileadmin.Config
-import com.franzmandl.fileadmin.service.ShutdownService
-import org.assertj.core.api.Assertions
+import com.franzmandl.fileadmin.model.ApplicationCtx
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,10 +18,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 class AuthenticationTests(
-    @Autowired val mockMvc: MockMvc,
+    @Autowired private val mockMvc: MockMvc,
 ) {
     @MockBean
-    lateinit var shutdownService: ShutdownService
+    private lateinit var shutdownService: ShutdownService
 
     private fun attemptLogin(username: String, password: String) =
         mockMvc.perform(
@@ -68,13 +67,13 @@ class AuthenticationTests(
             .andExpect(MockMvcResultMatchers.status().isOk)
             .andReturn().response
         val rememberMeCookie = response.getCookie(rememberMeCookieName)!!
-        Assertions.assertThat(rememberMeCookie.maxAge).isEqualTo(7 * 24 * 60 * 60)
-        Assertions.assertThat(rememberMeCookie.secure).isEqualTo(true)
-        Assertions.assertThat(rememberMeCookie.isHttpOnly).isEqualTo(true)
-        mockMvc.perform(MockMvcRequestBuilders.get("${Config.RequestMappingPaths.authenticated}/directory?path=/"))
+        assertThat(rememberMeCookie.maxAge).isEqualTo(7 * 24 * 60 * 60)
+        assertThat(rememberMeCookie.secure).isEqualTo(true)
+        assertThat(rememberMeCookie.isHttpOnly).isEqualTo(true)
+        mockMvc.perform(MockMvcRequestBuilders.get("${ApplicationCtx.RequestMappingPaths.authenticated}/directory?path=/"))
             .andExpect(MockMvcResultMatchers.status().isUnauthorized)
         mockMvc.perform(
-            MockMvcRequestBuilders.get("${Config.RequestMappingPaths.authenticated}/directory?path=/")
+            MockMvcRequestBuilders.get("${ApplicationCtx.RequestMappingPaths.authenticated}/directory?path=/")
                 .cookie(rememberMeCookie)
         )
             .andExpect(MockMvcResultMatchers.status().isOk)

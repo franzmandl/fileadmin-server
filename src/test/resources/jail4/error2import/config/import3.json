@@ -1,0 +1,7 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["import4.json"],
+  "tags": [
+    {"_type": "TagVersion1", "name": "#import3"},
+  null]
+}

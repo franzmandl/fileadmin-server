@@ -1,6 +1,4 @@
 {
-  "discriminator": "SettingsVersion1",
-  "runLast": {
-    "discriminator": "RunLastVersion1"
-  }
+  "_type": "RunLastVersion1",
+  "condition": {"_type": "ConditionVersion1", "nameGlob": "*.txt", "minDepth": 1}
 }

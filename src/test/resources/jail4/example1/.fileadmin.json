@@ -1,0 +1,44 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["input1/pruneName/file.json"],
+  "input": [
+    {"_type": "InputVersion1", "path": "input0", "enable": false, "comment": "Disabled."},
+    {"_type": "InputVersion1", "path": "input1",
+      "condition": {"_type": "ConditionVersion1", "minDepth": 1},
+      "contentCondition": {"_type": "ConditionVersion1", "directoryNameGlob": "*", "fileNameGlob": "*"},
+      "pruneNames": [".ignoreDirectory", ".ignoreFile", "pruneName"]
+    },
+    {"_type": "InputVersion1", "path": "input2"}
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  },
+  "tags": [
+    {"_type": "TagVersion1", "name": "#device", "children":  [
+      {"_type": "TagVersion1", "name": "#desktop1"},
+      {"_type": "TagVersion1", "name": "#phone1", "comment": "some comment"},
+      {"_type": "TagVersion1", "name": "#printer1"},
+    null]},
+    {"_type": "TagVersion1", "name": "#person", "children": [
+      {"_type": "TagVersion1", "name": "#AntonioElliott"},
+      {"_type": "TagVersion1", "name": "#KeaganValencia"},
+      {"_type": "TagVersion1", "name": "#LandenKirk"},
+      {"_type": "TagVersion1", "name": "#FranzMandl#Me"},
+      {"_type": "TagVersion1", "name": "#MinaHendricks"},
+    null]},
+    {"_type": "TagVersion1", "name": "#hardware"},
+    {"_type": "TagVersion1", "name": "#software", "children": [
+      {"_type": "TagVersion1", "name": "#code", "children": [
+        {"_type": "TagVersion1", "name": "#js#javascript"},
+      null]},
+    null]},
+    {"_type": "TagVersion1", "name": "#programming", "children": [
+      {"_type": "TagVersion1", "name": "#js#javascript"},
+    null]},
+    {"_type": "TagVersion1", "name": "#unused1", "children":  [
+      {"_type": "TagVersion1", "name": "#unused2"},
+    null]},
+    {"_type": "TagVersion1", "name": "#unused3"},
+  null]
+}

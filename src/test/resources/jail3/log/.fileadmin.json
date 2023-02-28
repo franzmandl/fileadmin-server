@@ -1,12 +1,10 @@
 {
-  "discriminator": "SettingsVersion1",
-  "children": {
-    "discriminator": "SettingsVersion1",
-    "basenameCursorPosition": 10,
-    "newInodeTemplate": {
-      "discriminator": "NewInodeVersion1",
-      "basename": "<now>.txt",
-      "isFile": true
-    }
+  "_type": "DirectoryValueVersion1",
+  "condition": {"_type": "ConditionVersion1", "minDepth": 1, "maxDepth": 1},
+  "nameCursorPosition": 16,
+  "newInodeTemplate": {
+    "_type": "NewInodeVersion1",
+    "isFile": true,
+    "name": "<nowMinute>.txt"
   }
 }

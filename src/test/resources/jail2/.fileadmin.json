@@ -1,0 +1,4 @@
+{
+  "_type": "TasksVersion1",
+  "condition": {"_type": "ConditionVersion1", "minDepth": 3, "maxDepth": 3}
+}

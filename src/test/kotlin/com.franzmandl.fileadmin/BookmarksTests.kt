@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers
 @ActiveProfiles("test", "jail3")
 @AutoConfigureMockMvc
 class BookmarksTests(
-    @Autowired val mockMvc: MockMvc,
+    @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
     fun testPublic() {

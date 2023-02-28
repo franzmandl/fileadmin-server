@@ -10,6 +10,9 @@
 				4tab Nulla facilisi morbi tempus iaculis urna id volutpat lacus laoreet.
 + plus Auctor urna nunc id cursus metus aliquam eleifend mi.
   - minus Euismod elementum nisi quis eleifend quam.
+    ++ double plus Sit amet ++ massa vitae tortor condimentum.
+      -- double minus Molestie nunc non blandit -- massa enim nec dui nunc.
+      +- plus minus Tellus in hac habitasse +- platea dictumst vestibulum.
     = equals Turpis egestas maecenas pharetra convallis posuere.
   > greater than In fermentum et sollicitudin ac orci. Elit at imperdiet dui accumsan sit amet nulla.
 ~ tilde Egestas tellus rutrum tellus pellentesque eu tincidunt tortor aliquam nulla.

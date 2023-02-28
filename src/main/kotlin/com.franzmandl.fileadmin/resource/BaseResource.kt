@@ -1,8 +1,8 @@
 package com.franzmandl.fileadmin.resource
 
+import com.franzmandl.fileadmin.common.HttpException
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
-
 
 abstract class BaseResource {
     @ExceptionHandler(HttpException::class)

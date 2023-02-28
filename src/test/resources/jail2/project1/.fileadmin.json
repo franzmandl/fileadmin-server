@@ -1,14 +1,6 @@
 {
-  "discriminator": "SettingsVersion1",
-  "tickets": {
-    "discriminator": "TicketsVersion1"
-  },
-  "children": {
-    "discriminator": "SettingsVersion1",
-    "newInodeTemplate": {
-      "discriminator": "NewInodeVersion1",
-      "basename": "<now> - .txt",
-      "isFile": false
-    }
-  }
+  "_type": "NewInodeVersion1",
+  "condition": {"_type": "ConditionVersion1", "minDepth": 1, "maxDepth": 1},
+  "isFile": false,
+  "name": "<nowDay> - <cursor>.txt"
 }

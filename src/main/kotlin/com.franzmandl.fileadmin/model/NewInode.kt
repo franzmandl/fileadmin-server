@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class NewInode(
-    val basename: String,
     val isFile: Boolean,
+    val name: String,
 )

@@ -1,6 +1,6 @@
 package com.franzmandl.fileadmin.resource
 
-import com.franzmandl.fileadmin.Config
+import com.franzmandl.fileadmin.model.ApplicationCtx
 import org.springframework.boot.web.servlet.error.ErrorController
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
@@ -11,17 +11,16 @@ import javax.servlet.RequestDispatcher
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-
 @Controller
 class MiscResource : ErrorController {
-    @RequestMapping(value = [Config.RequestMappingPaths.login], method = [RequestMethod.GET])
+    @RequestMapping(value = [ApplicationCtx.RequestMappingPaths.login], method = [RequestMethod.GET])
     @ResponseBody
     fun respondLoginPostMethod(response: HttpServletResponse): String {
         response.status = HttpServletResponse.SC_UNAUTHORIZED
         return "Authentication required."
     }
 
-    @RequestMapping(value = [Config.RequestMappingPaths.error], method = [RequestMethod.GET])
+    @RequestMapping(value = [ApplicationCtx.RequestMappingPaths.error], method = [RequestMethod.GET])
     @ResponseBody
     fun respondErrorGetMethod(request: HttpServletRequest): String {
         val statusCode = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE) as Int? ?: 200

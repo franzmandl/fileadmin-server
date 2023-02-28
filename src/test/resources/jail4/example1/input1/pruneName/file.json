@@ -1,0 +1,7 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["directory"],
+  "tags": [
+    {"_type": "TagVersion1", "name": "#import2"},
+  null]
+}

@@ -10,7 +10,6 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import javax.activation.MimetypesFileTypeMap
 
-
 class Mimetype {
     private fun usingMimeTypesFileTypeMap(pathname: String): String {
         val file = File(pathname)
@@ -38,7 +37,7 @@ class Mimetype {
 
     @Disabled
     @Test
-    fun usingMimeTypesFileTypeMap() {
+    fun testUsingMimeTypesFileTypeMap() {
         for ((filename, mimetype) in map) {
             assertThat(usingMimeTypesFileTypeMap(filename)).withFailMessage(filename).isEqualTo(mimetype)
         }
@@ -46,7 +45,7 @@ class Mimetype {
 
     @Disabled
     @Test
-    fun usingGetFileNameMap() {
+    fun testUsingGetFileNameMap() {
         for ((filename, mimetype) in map) {
             assertThat(usingGetFileNameMap(filename)).withFailMessage(filename).isEqualTo(mimetype)
         }
@@ -54,7 +53,7 @@ class Mimetype {
 
     @Disabled
     @Test
-    fun usingGetContentType() {
+    fun testUsingGetContentType() {
         for ((filename, mimetype) in map) {
             assertThat(usingGetContentType(filename)).withFailMessage(filename).isEqualTo(mimetype)
         }
@@ -62,14 +61,14 @@ class Mimetype {
 
     @Disabled
     @Test
-    fun usingTika() {
+    fun testUsingTika() {
         for ((filename, mimetype) in map) {
             assertThat(usingTika(filename)).withFailMessage(filename).isEqualTo(mimetype)
         }
     }
 
     @Test
-    fun usingFilesProbeContentType() {
+    fun testUsingFilesProbeContentType() {
         for ((filename, mimetype) in map) {
             assertThat(usingFilesProbeContentType(filename)).withFailMessage(filename).isEqualTo(mimetype)
         }

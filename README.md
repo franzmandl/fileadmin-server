@@ -1,7 +1,7 @@
 # FileAdmin - Server
 
-FileAdmin is a web-based mobile-first file manager.
-This project contains server code only.
+FileAdmin is a web-based, mobile-first file manager.
+This project only contains server code.
 For more information please have a look at the corresponding web client project [fileadmin-web](https://github.com/franzmandl/fileadmin-web).
 
 ## Run in Development Mode

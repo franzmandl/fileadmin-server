@@ -1,5 +1,6 @@
 package com.franzmandl.fileadmin.security
 
+import com.franzmandl.fileadmin.common.CommonUtil
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.web.authentication.AuthenticationFailureHandler
@@ -8,10 +9,9 @@ import org.springframework.security.web.authentication.logout.LogoutSuccessHandl
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-
 class Handler : AuthenticationFailureHandler, AuthenticationSuccessHandler, LogoutSuccessHandler {
     private fun send(response: HttpServletResponse, message: String) {
-        response.contentType = CONTENT_PLAIN
+        response.contentType = CommonUtil.contentTypeTextPlainUtf8
         response.writer.print(message)
     }
 
@@ -38,9 +38,5 @@ class Handler : AuthenticationFailureHandler, AuthenticationSuccessHandler, Logo
         authentication: Authentication
     ) {
         send(response, "Success!")
-    }
-
-    companion object {
-        private const val CONTENT_PLAIN = "text/plain;charset=UTF-8"
     }
 }

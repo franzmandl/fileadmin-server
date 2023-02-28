@@ -1,7 +1,5 @@
 package com.franzmandl.fileadmin.security
 
-import com.franzmandl.fileadmin.service.LoginAttemptService
-import com.franzmandl.fileadmin.service.ShutdownService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,7 +16,7 @@ class AuthenticationFailureListener(
     @Autowired private val loginAttemptService: LoginAttemptService,
     @Autowired private val shutdownService: ShutdownService,
 ) : ApplicationListener<AuthenticationFailureBadCredentialsEvent> {
-    var logger: Logger = LoggerFactory.getLogger(AuthenticationFailureListener::class.java)
+    private val logger: Logger = LoggerFactory.getLogger(AuthenticationFailureListener::class.java)
 
     private fun logAttempt(event: AuthenticationFailureBadCredentialsEvent) {
         val list = LinkedList<String>()

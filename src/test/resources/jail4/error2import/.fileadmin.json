@@ -1,0 +1,8 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["config/import1.json"],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}
