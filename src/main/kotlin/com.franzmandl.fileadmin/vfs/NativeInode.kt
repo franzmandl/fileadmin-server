@@ -49,6 +49,15 @@ class NativeInode(
             throw HttpException.notAllowed().children(path).build()
         } catch (_: NoSuchFileException) {
             throw HttpException.notExists().children(path).build()
+        } catch (_: NotDirectoryException) {
+            throw HttpException.notSupported().children(path).build()
+        }
+
+    val childrenCount
+        get(): Int? = try {
+            localPath.useDirectoryEntries { sequence -> sequence.count() }
+        } catch (_: FileSystemException) {
+            null
         }
 
     override val contentOperation: Inode.ContentOperation = operation
@@ -65,9 +74,10 @@ class NativeInode(
                 } catch (_: FileAlreadyExistsException) {
                     throw HttpException.alreadyExists().copy(path).to(target.path).build()
                 } catch (_: FileSystemException) {
-                    throw HttpException.parentNotSupported().copy(path).to(target.path).build()
-                } catch (_: NoSuchFileException) {
-                    throw HttpException.notExists().copy(path).to(target.path).build()
+                    throw HttpException.notSupportedParent().copy(path).to(target.path).build()
+                } catch (e: NoSuchFileException) {
+                    throw (if (e.file == localPath.toString()) HttpException.notExists() else HttpException.notExistsParent())
+                        .copy(path).to(target.path).build()
                 }
 
             else -> throw HttpException.notSupported().copy(path).to(target.path).build()
@@ -85,6 +95,8 @@ class NativeInode(
             throw HttpException.notAllowed().create(path).build()
         } catch (_: FileAlreadyExistsException) {
             throw HttpException.alreadyExists().create(path).build()
+        } catch (_: NoSuchFileException) {
+            throw HttpException.notExistsParent().create(path).build()
         }
     }
 
@@ -158,9 +170,10 @@ class NativeInode(
                 } catch (_: FileAlreadyExistsException) {
                     throw HttpException.alreadyExists().move(path).to(target.path).build()
                 } catch (_: FileSystemException) {
-                    throw HttpException.parentNotSupported().move(path).to(target.path).build()
-                } catch (_: NoSuchFileException) {
-                    throw HttpException.notExists().move(path).to(target.path).build()
+                    throw HttpException.notSupportedParent().move(path).to(target.path).build()
+                } catch (e: NoSuchFileException) {
+                    throw (if (e.file == localPath.toString()) HttpException.notExists() else HttpException.notExistsParent())
+                        .move(path).to(target.path).build()
                 }
 
             else -> throw HttpException.notSupported().move(path).to(target.path).build()
@@ -277,6 +290,8 @@ class NativeInode(
             override val canInodeMove: Boolean get() = inode.exists
             override val canInodeRename: Boolean get() = inode.exists
             override val canInodeShare: Boolean get() = inode.isFile  // Implies exists.
+            override val canInodeToDirectory: Boolean get() = inode.isFile  // Implies exists.
+            override val canInodeToFile: Boolean get() = inode.isDirectory && inode.childrenCount.let { it != null && it <= 1 }  // Implies exists.
         }
 
         private class Permission(
@@ -292,6 +307,8 @@ class NativeInode(
             override val canInodeMove: Boolean get() = inode.operation.canInodeMove && parentCanWrite
             override val canInodeRename: Boolean get() = inode.operation.canInodeRename && parentCanWrite
             override val canInodeShare: Boolean get() = inode.operation.canInodeShare && inode.canRead
+            override val canInodeToDirectory: Boolean get() = inode.operation.canInodeToDirectory && parentCanWrite
+            override val canInodeToFile: Boolean get() = inode.operation.canInodeToFile && parentCanWrite
             private val parentCanWrite: Boolean get() = inode.parent.nullableValue.let { it is NativeInode && it.canWrite }
         }
     }

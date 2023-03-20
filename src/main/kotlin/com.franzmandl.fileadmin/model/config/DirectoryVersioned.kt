@@ -1,10 +1,12 @@
 package com.franzmandl.fileadmin.model.config
 
 import com.franzmandl.fileadmin.common.CommonUtil
+import com.franzmandl.fileadmin.vfs.SafePath
 import com.franzmandl.fileadmin.vfs.UnsafePath
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import java.nio.file.Path
 import java.nio.file.PathMatcher
 
 @Serializable
@@ -54,6 +56,31 @@ sealed class ConditionVersioned {
     abstract fun toLatestVersion(): ConditionVersion1
 }
 
+class CompiledCondition(
+    val nameGlobs: List<PathMatcher>?,
+    val nameRegex: Regex?,
+    val pathRegex: Regex?,
+) {
+    constructor(
+        nameGlobString: String?,
+        nameRegexString: String?,
+        pathRegexString: String?,
+    ) : this(
+        nameGlobString?.split(orSeparator)?.map { CommonUtil.createGlob(it) },
+        nameRegexString?.let { Regex(it) },
+        pathRegexString?.let { Regex(it) },
+    )
+
+    fun evaluate(path: SafePath): Boolean =
+        nameGlobs?.let { CommonUtil.evaluateGlobs(it, Path.of(path.name)) } ?: false
+                || nameRegex?.containsMatchIn(path.name) ?: false
+                || pathRegex?.containsMatchIn(path.absoluteString) ?: false
+
+    companion object {
+        private const val orSeparator = '|'
+    }
+}
+
 @Serializable
 @SerialName("ConditionVersion1")
 data class ConditionVersion1(
@@ -71,41 +98,27 @@ data class ConditionVersion1(
     val nameGlob: String? = null,
     val nameRegex: String? = null,
     val minDepth: Int? = null,
-    /** Same as minDepth. */
     val maxDepth: Int? = null,
     val pathRegex: String? = null,
 ) : ConditionVersioned() {
     @Transient
-    val compiledDirectoryNameGlobs: List<PathMatcher>? = directoryNameGlob?.split(orSeparator)?.map { CommonUtil.createGlob(it) }
+    val commonCondition = CompiledCondition(nameGlob, nameRegex, pathRegex)
 
     @Transient
-    val compiledDirectoryNameRegex = directoryNameRegex?.let { Regex(it) }
+    val directoryCondition = CompiledCondition(directoryNameGlob, directoryNameRegex, directoryPathRegex)
 
     @Transient
-    val compiledDirectoryPathRegex = directoryPathRegex?.let { Regex(it) }
+    val fileCondition = CompiledCondition(fileNameGlob, fileNameRegex, filePathRegex)
 
     @Transient
-    val compiledFileNameGlobs: List<PathMatcher>? = fileNameGlob?.split(orSeparator)?.map { CommonUtil.createGlob(it) }
+    val defaultMinDepth = minDepth ?: 0
 
     @Transient
-    val compiledFileNameRegex = fileNameRegex?.let { Regex(it) }
-
-    @Transient
-    val compiledFilePathRegex = filePathRegex?.let { Regex(it) }
-
-    @Transient
-    val compiledNameGlobs: List<PathMatcher>? = nameGlob?.split(orSeparator)?.map { CommonUtil.createGlob(it) }
-
-    @Transient
-    val compiledNameRegex = nameRegex?.let { Regex(it) }
-
-    @Transient
-    val compiledPathRegex = pathRegex?.let { Regex(it) }
+    val defaultMaxDepth = maxDepth ?: defaultMinDepth
 
     override fun toLatestVersion(): ConditionVersion1 = this
 
     companion object {
-        private const val orSeparator = '|'
         val default = ConditionVersion1()
     }
 }

@@ -43,6 +43,8 @@ class VirtualDirectory(
         override val canFileStream: Boolean = false
         override val canInodeCopy: Boolean = false
         override val canInodeShare: Boolean = false
+        override val canInodeToDirectory: Boolean = false
+        override val canInodeToFile: Boolean = false
     }
 
     interface TreeOperation : Inode.TreeOperation {

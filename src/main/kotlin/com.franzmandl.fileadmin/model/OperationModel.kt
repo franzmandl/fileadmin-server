@@ -14,4 +14,6 @@ data class OperationModel(
     val canInodeMove: Boolean,
     val canInodeRename: Boolean,
     val canInodeShare: Boolean,
+    val canInodeToDirectory: Boolean,
+    val canInodeToFile: Boolean,
 )

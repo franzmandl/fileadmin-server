@@ -1,6 +1,7 @@
 package com.franzmandl.fileadmin.filter
 
 import com.franzmandl.fileadmin.common.HttpException
+import com.franzmandl.fileadmin.model.config.ConditionVersion1
 import com.franzmandl.fileadmin.resource.RequestCtx
 import com.franzmandl.fileadmin.vfs.Inode
 import com.franzmandl.fileadmin.vfs.SafePath
@@ -31,9 +32,9 @@ class TagTreeOperation(
         }
         try {
             replaceConfigFile(replaceCtx)
-            replaceContent(replaceCtx.reset())
-            replaceName(replaceCtx.reset())
-            replaceParentPath(replaceCtx.reset())
+            replaceContent(replaceCtx)
+            replaceName(replaceCtx)
+            replaceParentPath(replaceCtx)
         } catch (e: Exception) {
             throw HttpException.badRequest(replaceCtx.revert(e))
         }
@@ -53,7 +54,6 @@ class TagTreeOperation(
         private val logger: Logger = LoggerFactory.getLogger(ReplaceCtx::class.java)
         private val oldHash = "${FilterFileSystem.tagPrefix}$oldName"
         private val newHash = "${FilterFileSystem.tagPrefix}$newName"
-        private var lastItemsSize = 0
 
         fun addCommand(command: Command) {
             try {
@@ -80,24 +80,14 @@ class TagTreeOperation(
         }
 
         fun getNextItem(reason: TagFilter.Reason): Item? {
-            val items = system.ctx.filterItems(listOf(TagFilter(getTag() ?: return null, reason, TagFilter.Relationship.Self))) {
+            val items = system.ctx.filterItems(request, listOf(TagFilter(getTag() ?: return null, reason, TagFilter.Relationship.Self))) {
                 throw HttpException.badRequest(it)
             }
-            if (items.size >= lastItemsSize) {
-                // Note: False positive if an item get the same tag twice from its parentPath on two different levels.
-                throw HttpException.badRequest("Endless detected: Items size did not decrease (${items.size} >= $lastItemsSize).")
-            }
-            lastItemsSize = items.size
             return items.firstOrNull()
         }
 
         fun replaceString(string: String): String =
             string.replace(oldHash, newHash)
-
-        fun reset(): ReplaceCtx {
-            lastItemsSize = Int.MAX_VALUE
-            return this
-        }
 
         fun revert(e: Exception): String {
             val builder = StringBuilder().appendLine("An error occurred during renaming. This message is also logged.")
@@ -125,6 +115,45 @@ class TagTreeOperation(
         }
     }
 
+    private class ContentVisitor(
+        private val ctx: ReplaceCtx,
+        override val condition: ConditionVersion1,
+        override val pruneNames: Set<String>,
+    ) : ItemContent.Visitor {
+        override val onError: (String) -> Unit = { throw HttpException.badRequest(it) }
+
+        override fun onDirectory(inode: Inode): Boolean {
+            for (child in inode.children) {
+                if (!move(child, null)) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        override fun onFile(inode: Inode): Boolean {
+            val oldText = inode.text
+            val newText = ctx.replaceString(oldText)
+            ctx.addCommand(SetTextCommand(inode, oldText, newText))
+            return oldText === newText
+        }
+
+        override fun onName(inode: Inode): Boolean =
+            move(inode.path, inode)
+
+        private fun move(path: SafePath, inode: Inode?): Boolean {
+            val newInodeName = ctx.replaceString(path.name)
+            if (newInodeName === path.name) {
+                return true
+            }
+            val oldInode = inode ?: ctx.request.getInode(path)
+            val newPath = oldInode.path.resolveSibling(newInodeName)
+            val newInode = ctx.request.getInode(newPath)
+            ctx.addCommand(MoveCommand(ctx.request, oldInode, newInode))
+            return false
+        }
+    }
+
     private fun replaceConfigFile(ctx: ReplaceCtx) {
         while (ctx.condition()) {
             val configFiles = (ctx.getTag() ?: break).configFiles
@@ -142,23 +171,7 @@ class TagTreeOperation(
     private fun replaceContent(ctx: ReplaceCtx) {
         while (ctx.condition()) {
             val item = ctx.getNextItem(TagFilter.Reason.Content) ?: break
-            if (item.inode.contentPermission.canFileGet) {
-                val oldText = item.inode.text
-                val newText = ctx.replaceString(oldText)
-                ctx.addCommand(SetTextCommand(item.inode, oldText, newText))
-            } else if (item.inode.contentPermission.canDirectoryGet) {
-                for (oldPath in item.inode.children) {
-                    val newInodeName = ctx.replaceString(oldPath.name)
-                    if (newInodeName == oldPath.name) {
-                        continue
-                    }
-                    val oldInode = ctx.request.getInode(oldPath)
-                    val newPath = oldInode.path.resolveSibling(newInodeName)
-                    val newInode = ctx.request.getInode(newPath)
-                    ctx.addCommand(MoveCommand(ctx.request, oldInode, newInode))
-                    break
-                }
-            }
+            ItemContent.visit(ctx.request.createPathFinderCtx(), item.inode, ContentVisitor(ctx, item.input.contentCondition, item.input.pruneNames))
         }
     }
 

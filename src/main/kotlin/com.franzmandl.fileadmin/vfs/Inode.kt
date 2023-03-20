@@ -2,6 +2,7 @@ package com.franzmandl.fileadmin.vfs
 
 import com.franzmandl.fileadmin.common.OptionalValue
 import com.franzmandl.fileadmin.filter.FilterFileSystem
+import com.franzmandl.fileadmin.filter.Tag
 import com.franzmandl.fileadmin.model.NewInode
 import com.franzmandl.fileadmin.resource.RequestCtx
 import org.springframework.core.io.support.ResourceRegion
@@ -54,12 +55,20 @@ interface Inode : InodeWithoutConfig, TreeInode {
         val parentOfRoot = OptionalValue.Fail<InodeWithoutConfig>("Inode is root.")
 
         fun getChildrenAsText(inode: Inode): String =
-            inode.children.joinToString("\n") { it.name }
+            getChildrenAsTextTo(StringBuilder(), inode).toString()
+
+        fun <A : Appendable> getChildrenAsTextTo(buffer: A, inode: Inode): A {
+            for (child in inode.children) {
+                buffer.appendLine(child.name)
+            }
+            return buffer
+        }
     }
 
     interface Config {
         val errors: List<String>
         val filter: FilterFileSystem?
+        var filterHighlightTags: Set<Tag>?
         val isRunLast: Boolean
         val isTask: Boolean
         val nameCursorPosition: Int?
@@ -75,6 +84,8 @@ interface Inode : InodeWithoutConfig, TreeInode {
         val canFileStream: Boolean
         val canInodeCopy: Boolean
         val canInodeShare: Boolean
+        val canInodeToDirectory: Boolean
+        val canInodeToFile: Boolean
     }
 
     interface TreeOperation {

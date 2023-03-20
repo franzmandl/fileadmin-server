@@ -22,6 +22,7 @@ class PathFinder(
     override val errors: List<String> = ctx.errors
     override var filter: FilterFileSystem? = null
         private set
+    override var filterHighlightTags: Set<Tag>? = null
     override var isRunLast: Boolean = false
         private set
     override var isTask: Boolean = false
@@ -147,19 +148,23 @@ class PathFinder(
                         null
                     } else {
                         val path = configDirectory.forceResolve(latestInput.path)
-                        val automaticInputTags = mutableSetOf<Tag>()
+                        val automaticTags = mutableSetOf<Tag.Mutable>()
+                        if (latestInput.automaticTags != null) {
+                            for (aliases in latestInput.automaticTags) {
+                                getOrCreateTagsTo(automaticTags, registry, aliases, configFile, false, null)
+                            }
+                        }
                         if (latestInput.automaticInputTag != false) {
                             if (FilterFileSystem.isValidName(path.name)) {
-                                automaticInputTags.add(addParentTag(configFile.path, registry.getOrCreateTag(path.name, Tag.Parameter.default), registry.tagInput))
+                                automaticTags.add(addParentTag(configFile.path, registry.getOrCreateTag(path.name, null), registry.tagInput))
                             } else {
                                 ctx.errors.add("${configFile.path}: Input '${path.name}' is no valid name for a tag.")
                             }
                         } else {
-                            automaticInputTags.add(registry.tagInput)
+                            automaticTags.add(registry.tagInput)
                         }
-                        InputDirectory(
-                            ctx.request,
-                            automaticInputTags = automaticInputTags,
+                        Input(
+                            automaticTags = automaticTags,
                             condition = latestInput.condition?.toLatestVersion() ?: ConditionVersion1.default,
                             contentCondition = latestInput.contentCondition?.toLatestVersion() ?: ConditionVersion1.default,
                             path = path,
@@ -188,32 +193,51 @@ class PathFinder(
             otherwise
         }
 
-    private fun registerFilterTags(registry: TagRegistry, configTags: List<ConfigTag>, parents: List<Tag.Mutable>, isRoot: Boolean) {
+    private fun registerFilterTags(registry: TagRegistry, configTags: Iterable<ConfigTag>, implicitParents: Iterable<Tag.Mutable>, isRoot: Boolean) {
         for (configTag in configTags) {
-            val tags = getOrCreateTags(
-                registry, configTag.latest.name, configTag.configFile, isRoot, Tag.Parameter(
-                    canRename = configTag.latest.canRename ?: Tag.Parameter.default.canRename,
-                    priority = configTag.latest.priority ?: Tag.Parameter.default.priority,
-                )
-            )
-            tags.forEach { tag -> parents.forEach { parent -> addParentTag(configTag.configFile.path, tag, parent) } }
+            val tags = getOrCreateTags(registry, configTag.configFile, isRoot, configTag.latest)
+            val parents = if (configTag.latest.parents != null) {
+                val explicitParents = mutableListOf<Tag.Mutable>()
+                for (aliases in configTag.latest.parents) {
+                    getOrCreateTagsTo(explicitParents, registry, aliases, configTag.configFile, false, null)
+                }
+                explicitParents
+            } else {
+                implicitParents
+            }
+            val spread = configTag.latest.spread == true
+            for (tag in tags) {
+                for (parent in parents) {
+                    if (spread) {
+                        parent.addChildrenOf(tag)
+                    }
+                    addParentTag(configTag.configFile.path, tag, parent)
+                }
+            }
             registerFilterTags(registry, configTag.children, tags, false)
         }
     }
 
-    private fun getOrCreateTags(registry: TagRegistry, aliases: String, configFile: Inode, isRoot: Boolean, parameter: Tag.Parameter): List<Tag.Mutable> {
+    private fun getOrCreateTags(registry: TagRegistry, configFile: Inode, isRoot: Boolean, latest: TagVersion1): List<Tag.Mutable> =
+        getOrCreateTagsTo(mutableListOf(), registry, latest.name, configFile, isRoot, latest)
+
+    private fun <C : MutableCollection<Tag.Mutable>> getOrCreateTagsTo(destination: C, registry: TagRegistry, aliases: String, configFile: Inode, isRoot: Boolean, latest: TagVersion1?): C {
         var twin: Tag.Mutable? = null
-        return aliases.split(FilterFileSystem.tagPrefixString).mapIndexedNotNull { index, name ->
+        return aliases.split(FilterFileSystem.tagPrefixString).mapIndexedNotNullTo(destination) { index, name ->
             if (index == 0) {
                 if (name != "") {
                     ctx.errors.add("${configFile.path}: Missing ${FilterFileSystem.tagPrefix} before tag name in '$aliases'.")
                 }
                 null
             } else if (FilterFileSystem.isValidName(name)) {
-                val tag = registry.getOrCreateTag(name, parameter).addConfigFile(configFile)
+                val tag = registry.getOrCreateTag(name).addConfigFile(configFile)
                 twin?.let { setTwinTag(tag, it) }
                 twin = tag
-                tag.isRoot = tag.isRoot || isRoot
+                tag.parameter.isRoot = tag.parameter.isRoot || isRoot
+                if (latest != null) {
+                    tag.parameter.setCanRename(latest.canRename)
+                    tag.parameter.setPriority(latest.priority)
+                }
                 tag
             } else {
                 ctx.errors.add("${configFile.path}: '$name' is no valid name for a tag.")
@@ -306,10 +330,10 @@ class PathFinder(
         val latest = versioned?.toLatestVersion() ?: return null
         var result = true
         var startsWith: Boolean? = null
-        if (latest.compiledNameGlobs != null) {
+        if (latest.commonCondition.nameGlobs != null) {
             startsWith = if (startsWith ?: destination.startsWith(configDirectory)) {
                 result = result && CommonUtil.evaluateGlobs(
-                    latest.compiledNameGlobs,
+                    latest.commonCondition.nameGlobs,
                     Path.of(destination.relativeString.substring((configDirectory.relativeString.length + if (destination.relativeString.length > configDirectory.relativeString.length) 1 else 0))),
                 )
                 true
@@ -328,11 +352,11 @@ class PathFinder(
                 true
             } else false
         }
-        if (latest.compiledNameRegex != null) {
-            result = result && latest.compiledNameRegex.matches(destination.name)
+        if (latest.commonCondition.nameRegex != null) {
+            result = result && latest.commonCondition.nameRegex.matches(destination.name)
         }
-        if (latest.compiledPathRegex != null) {
-            result = result && latest.compiledPathRegex.matches(destination.absoluteString)
+        if (latest.commonCondition.pathRegex != null) {
+            result = result && latest.commonCondition.pathRegex.matches(destination.absoluteString)
         }
         return result
     }

@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class InodeModel(
     val error: String?,
+    val filterHighlightTags: Collection<String>?,
+    val filterOutputPath: SafePath?,
     val friendlyName: String?,
     val isDirectory: Boolean,
     val isFile: Boolean,

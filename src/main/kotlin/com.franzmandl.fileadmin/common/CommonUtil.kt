@@ -117,6 +117,13 @@ object CommonUtil {
     fun takeStringIf(condition: Boolean, string: String): String =
         if (condition) string else ""
 
+    fun <E> getReversedSequenceOf(list: List<E>): Sequence<E> =
+        sequence {
+            for (index in list.lastIndex downTo 0) {
+                yield(list[index])
+            }
+        }
+
     fun getSequenceOfChildren(ctx: RequestCtx, directory: InodeWithoutConfig): Sequence<Inode> =
         sequence {
             for (child in directory.children) {
@@ -157,4 +164,7 @@ object CommonUtil {
     }
 
     fun noop(@Suppress("UNUSED_PARAMETER") vararg any: Any) {}
+
+    fun <T>nextOrNull(iterator: Iterator<T>): T? =
+        if (iterator.hasNext()) iterator.next() else null
 }

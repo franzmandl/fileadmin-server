@@ -1,32 +1,33 @@
 package com.franzmandl.fileadmin.filter
 
 import com.franzmandl.fileadmin.common.CommonUtil
+import com.franzmandl.fileadmin.resource.RequestCtx
 import com.franzmandl.fileadmin.vfs.SafePath
 import java.util.*
 
 class FilterCtx(
     val registry: TagRegistry,
-    private val inputs: List<InputDirectory>,
+    private val inputs: List<Input>,
     val output: SafePath,
     private val hierarchicalTags: Boolean,
 ) {
-    fun scanItems(force: Boolean, onError: (String) -> Unit) {
+    fun scanItems(ctx: RequestCtx, force: Boolean, onError: (String) -> Unit) {
         registry.clearIf(force)
         for (input in inputs) {
-            input.getItems(registry, force, onError)
+            input.getItems(ctx, registry, force, onError)
         }
     }
 
-    fun getSequenceOfItems(force: Boolean, onError: (String) -> Unit) =
+    fun getSequenceOfItems(ctx: RequestCtx, force: Boolean, onError: (String) -> Unit) =
         sequence {
             registry.clearIf(force)
             for (input in inputs) {
-                yieldAll(input.getItems(registry, force, onError))
+                yieldAll(input.getItems(ctx, registry, force, onError))
             }
         }
 
-    fun filterItems(filters: List<Filter>, onError: (String) -> Unit): MutableList<Item> {
-        val items = getSequenceOfItems(false, onError).toMutableList()
+    fun filterItems(ctx: RequestCtx, filters: List<Filter>, onError: (String) -> Unit): MutableList<Item> {
+        val items = getSequenceOfItems(ctx, false, onError).toMutableList()
         for (filter in filters) {
             val iterator = items.iterator()
             while (iterator.hasNext()) {
@@ -38,16 +39,16 @@ class FilterCtx(
         return items
     }
 
-    fun filterNames(filters: List<Filter>, onError: (String) -> Unit, result: Result): MutableSet<String> {
+    fun filterNames(ctx: RequestCtx, onError: (String) -> Unit, result: Result): MutableSet<String> {
         val tags = mutableSetOf<Tag>()
-        val items = filterItems(filters, onError)
+        val items = filterItems(ctx, result.filters, onError)
         items.firstOrNull()?.let { result.commonTags.addAll(it.allTags.all) }
         for (item in items) {
             result.commonTags.retainAll(item.allTags.all)
             tags.addAll(item.allTags.all)
         }
         val tagsInFilter = mutableSetOf<Tag>()
-        for (filter in filters) {
+        for (filter in result.filters) {
             if (filter is TagFilter) {
                 filter.tag.addAncestorsTo(tagsInFilter)  // Ancestors are implied.
                 tagsInFilter.add(filter.tag)
@@ -59,10 +60,24 @@ class FilterCtx(
         tags.removeAll(result.commonTags)
         // tagsInFilter is not always a subset of commonTags. If items is empty, then commonTags is empty, but tagsInFilter might contain tags.
         if (hierarchicalTags) {
-            tags.retainAll { tag -> tag.isRoot || tag.parents.any { parent -> parent in tagsInFilter || parent in result.commonTags } }
+            tags.retainAll { tag ->
+                tag.parameter.isRoot || tag.parents.any { parent ->
+                    parent in tagsInFilter || parent in result.commonTags || parent.parents.any { grandparent ->
+                        grandparent.childrenOf.any { childrenOf ->
+                            childrenOf.parents.any { it in tagsInFilter }
+                        }
+                    }
+                }
+            }
         }
-        val lastTagChildren = tagsInFilter.lastOrNull()?.children ?: setOf()
-        return tags.mapTo(mutableSetOf()) { tag -> CommonUtil.takeStringIf(tag in lastTagChildren, FilterFileSystem.childPrefixString) + tag.friendlyName }
+        val lastTagInFilterChildren = mutableSetOf<Tag>()
+        tagsInFilter.lastOrNull()?.let {
+            lastTagInFilterChildren.addAll(it.children)
+            for (childrenOf in it.childrenOf) {
+                lastTagInFilterChildren.addAll(childrenOf.children)
+            }
+        }
+        return tags.mapTo(mutableSetOf()) { tag -> CommonUtil.takeStringIf(tag in lastTagInFilterChildren, FilterFileSystem.childPrefixString) + tag.friendlyName }
     }
 
     private class FilterStringsIterator(
@@ -131,7 +146,7 @@ class FilterCtx(
         }
     }
 
-    fun filter(path: SafePath, filterStrings: List<String>, onError: (String) -> Unit): Result {
+    fun filter(ctx: RequestCtx, path: SafePath, filterStrings: List<String>, onError: (String) -> Unit): Result {
         var isOperator = false
         val builder = FiltersBuilder(onError, registry)
         val iterator = FilterStringsIterator(filterStrings.iterator())
@@ -141,16 +156,16 @@ class FilterCtx(
                 isOperator = false
                 when (value) {
                     FilterFileSystem.operatorEvaluate -> {
-                        val result = Result(false)
+                        val result = Result(false, builder.filters)
                         builder.addIllegalAppendixError(iterator)
-                        filterItems(builder.filters, onError).mapTo(result.children) { it.inode.path }
+                        filterItems(ctx, builder.filters, onError).mapTo(result.children) { it.inode.path }
                         return result
                     }
 
                     FilterFileSystem.operator -> {
                         isOperator = true
                         if (!iterator.hasNext()) {
-                            val result = Result(false)
+                            val result = Result(false, builder.filters)
                             result.children.add(path.resolve(FilterFileSystem.operatorEvaluate))
                             result.children.add(path.resolve(FilterFileSystem.operatorNot))
                             if (builder.lastTag != null) {
@@ -176,10 +191,10 @@ class FilterCtx(
             }
             isOperator = isOperator || iterator.parts.hasNext()
         }
-        val result = Result(canRename(builder.filters.lastOrNull()))
-        filterNames(builder.filters, onError, result).mapTo(result.children) { name -> path.resolve(name) }
+        val result = Result(canRename(builder.filters.lastOrNull()), builder.filters)
+        filterNames(ctx, onError, result).mapTo(result.children) { name -> path.resolve(name) }
         if (result.children.isEmpty()) {
-            filterItems(builder.filters, onError).mapTo(result.children) { it.inode.path }
+            filterItems(ctx, builder.filters, onError).mapTo(result.children) { it.inode.path }
         } else {
             result.children.add(path.resolve(FilterFileSystem.operatorPrefix + FilterFileSystem.operator))
             result.children.add(path.resolve(FilterFileSystem.operatorPrefix + FilterFileSystem.operatorEvaluate))
@@ -191,10 +206,23 @@ class FilterCtx(
     }
 
     class Result(
-        val canRename: Boolean
+        val canRename: Boolean,
+        val filters: List<Filter>,
     ) {
         val children = mutableSetOf<SafePath>()
         val commonTags = mutableSetOf<Tag>()
+
+        fun getHighlightTags(): MutableSet<Tag> {
+            val highlightTags = mutableSetOf<Tag>()
+            for (filter in CommonUtil.getReversedSequenceOf(filters)) {
+                if (filter is TagFilter && filter.tag !in highlightTags) {
+                    filter.tag.addAncestorsTo(highlightTags)
+                    filter.tag.addDescendantsTo(highlightTags)
+                    highlightTags.add(filter.tag)
+                }
+            }
+            return highlightTags
+        }
     }
 
     private fun canRename(filter: Filter?): Boolean =

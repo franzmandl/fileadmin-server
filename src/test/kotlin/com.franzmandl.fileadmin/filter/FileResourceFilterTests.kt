@@ -102,7 +102,7 @@ class FileResourceFilterTests(
                 .andReturn()
         val lines = result.response.contentAsString.split("\n").toSet()
         // Then
-        assertThat(lines).containsExactly("AntonioElliott", "hardware", "MinaHendricks", "unused1", "unused2", "unused3", "")
+        assertThat(lines).containsExactly("AntonioElliott", "hardware", "MinaHendricks", "Mom", "unused1", "unused2", "unused3", "")
     }
 
     @Test

@@ -8,8 +8,8 @@ sealed interface Tag {
     val parameter: Parameter
     val friendlyName: String
     val children: Set<Tag>
+    val childrenOf: Set<Tag>
     val parents: Set<Tag>
-    val isRoot: Boolean
     val comparableName: String
     val configFiles: Map<SafePath, Inode>
     val sortableName: String
@@ -22,12 +22,12 @@ sealed interface Tag {
 
     class Mutable(
         override val name: String,
-        override val parameter: Parameter,
     ) : Tag {
         private var twin: Mutable? = null
         override val children = mutableSetOf<Mutable>()
+        override val childrenOf = mutableSetOf<Mutable>()
+        override val parameter = Parameter.Mutable(canRename = true, isRoot = false, priority = 0)
         override val parents = mutableSetOf<Mutable>()
-        override var isRoot: Boolean = false
         override val comparableName = FilterFileSystem.toComparableName(name)
         override val configFiles = mutableMapOf<SafePath, Inode>()
         override val sortableName = FilterFileSystem.toSortableName(name)
@@ -37,6 +37,11 @@ sealed interface Tag {
 
         fun addConfigFile(inode: Inode): Mutable {
             configFiles[inode.path] = inode
+            return this
+        }
+
+        fun addChildrenOf(tag: Mutable): Mutable {
+            this.childrenOf.add(tag)
             return this
         }
 
@@ -111,11 +116,33 @@ sealed interface Tag {
         override fun toString(): String = "Tag:$friendlyName"
     }
 
-    class Parameter(val canRename: Boolean, val priority: Int) {
-        companion object {
-            val default = Parameter(true, 0)
-            val system0 = Parameter(false, 0)
-            val system1 = Parameter(false, 1)
+    sealed interface Parameter {
+        val canRename: Boolean
+        val isRoot: Boolean
+        val priority: Int
+
+        class Mutable(
+            override var canRename: Boolean,
+            override var isRoot: Boolean,
+            override var priority: Int,
+        ) : Parameter {
+            fun initSystem(priority: Int) {
+                canRename = false
+                isRoot = true
+                this.priority = priority
+            }
+
+            fun setCanRename(canRename: Boolean?) {
+                if (canRename != null) {
+                    this.canRename = canRename
+                }
+            }
+
+            fun setPriority(priority: Int?) {
+                if (priority != null) {
+                    this.priority = priority
+                }
+            }
         }
     }
 }

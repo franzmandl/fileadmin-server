@@ -5,7 +5,7 @@
     {"_type": "InputVersion1", "path": "input0", "enable": false, "comment": "Disabled."},
     {"_type": "InputVersion1", "path": "input1",
       "condition": {"_type": "ConditionVersion1", "minDepth": 1},
-      "contentCondition": {"_type": "ConditionVersion1", "directoryNameGlob": "*", "fileNameGlob": "*"},
+      "contentCondition": {"_type": "ConditionVersion1", "fileNameGlob": "*", "maxDepth": 1},
       "pruneNames": [".ignoreDirectory", ".ignoreFile", "pruneName"]
     },
     {"_type": "InputVersion1", "path": "input2"}
@@ -24,8 +24,12 @@
       {"_type": "TagVersion1", "name": "#AntonioElliott"},
       {"_type": "TagVersion1", "name": "#KeaganValencia"},
       {"_type": "TagVersion1", "name": "#LandenKirk"},
-      {"_type": "TagVersion1", "name": "#FranzMandl#Me"},
+      {"_type": "TagVersion1", "name": "#FranzMandl#me"},
       {"_type": "TagVersion1", "name": "#MinaHendricks"},
+      {"_type": "TagVersion1", "name": "#family", "spread": true, "children": [
+        {"_type": "TagVersion1", "name": "#Dad"},
+        {"_type": "TagVersion1", "name": "#Mom"},
+      null]},
     null]},
     {"_type": "TagVersion1", "name": "#hardware"},
     {"_type": "TagVersion1", "name": "#software", "children": [

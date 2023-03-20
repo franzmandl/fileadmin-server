@@ -15,8 +15,9 @@ class HttpException(
         fun notAllowed(): BuilderStart = Builder("Not allowed.")
         fun notAllowedDestination(): BuilderStart = Builder("Destination does not allow.")
         fun notExists(): BuilderStart = Builder("Inode does not exist.")
+        fun notExistsParent(): BuilderStart = Builder("Parent does not exist.")
         fun notSupported(): BuilderStart = Builder("Not supported.")
-        fun parentNotSupported(): BuilderStart = Builder("Parent does not support.")
+        fun notSupportedParent(): BuilderStart = Builder("Parent does not support.")
         fun processError(message: String): BuilderStart = Builder("Process error: $message")
         fun processTimeout(): BuilderStart = Builder("Process timeout.")
     }

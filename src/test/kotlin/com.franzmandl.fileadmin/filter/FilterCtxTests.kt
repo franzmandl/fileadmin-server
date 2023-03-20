@@ -31,7 +31,7 @@ class FilterCtxTests(
     }
 
     private val tagCode = filterCtx.registry.getTag("code")!!
-    private val tagMe = filterCtx.registry.getTag("Me")!!
+    private val tagMe = filterCtx.registry.getTag("me")!!
     private val tagPerson = filterCtx.registry.getTag("person")!!
     private val tagSoftware = filterCtx.registry.getTag("software")!!
     private val tagUnknown1 = filterCtx.registry.getTag("unknown1")!!
@@ -44,7 +44,7 @@ class FilterCtxTests(
         "/example1/input1/2022/2022-11-22 - #import1.txt",
         "/example1/input1/2022/2022-11-22 - #import2.txt",
         "/example1/input1/2022/2022-11-22 - #import3.txt",
-        "/example1/input1/2022/2022-11-22 - #Me.txt",
+        "/example1/input1/2022/2022-11-22 - #me.txt",
         "/example1/input1/2022/2022-11-22 - #person.txt",
         "/example1/input1/2022/2022-11-22 - #unknown1#unknown2.txt",
         "/example1/input1/2022/2022-11-22 - #unknown1.txt",
@@ -70,13 +70,13 @@ class FilterCtxTests(
     )
 
     private fun filter(onError: (String) -> Unit, vararg filterStrings: String) =
-        filterCtx.filter(SafePath(listOf()), filterStrings.toList(), onError)
+        filterCtx.filter(requestCtx, SafePath(listOf()), filterStrings.toList(), onError)
 
     private fun filterItems(vararg filters: Filter) =
-        filterCtx.filterItems(filters.toList(), ::onError)
+        filterCtx.filterItems(requestCtx, filters.toList(), ::onError)
 
     private fun filterNames(vararg filters: Filter) =
-        filterCtx.filterNames(filters.toList(), ::onError, FilterCtx.Result(false))
+        filterCtx.filterNames(requestCtx, ::onError, FilterCtx.Result(false, filters.toList()))
 
     private fun onError(message: String) {
         fail<Nothing>("An error occurred: $message")
@@ -111,7 +111,7 @@ class FilterCtxTests(
         assertThat(filterItems(NotFilter(createTagFilter(tagMe))).map(::getItemPath)).containsExactlyInAnyOrderElementsOf(
             allItemPaths - setOf(
                 "/example1/input1/2022/2022-11-22 - #FranzMandl.txt",
-                "/example1/input1/2022/2022-11-22 - #Me.txt",
+                "/example1/input1/2022/2022-11-22 - #me.txt",
             )
         )
     }
@@ -156,7 +156,7 @@ class FilterCtxTests(
     fun testFilterItemsByTwin() {
         assertThat(filterItems(createTagFilter(tagMe)).map(::getItemPath)).containsExactlyInAnyOrder(
             "/example1/input1/2022/2022-11-22 - #FranzMandl.txt",
-            "/example1/input1/2022/2022-11-22 - #Me.txt",
+            "/example1/input1/2022/2022-11-22 - #me.txt",
         )
     }
 
@@ -173,10 +173,12 @@ class FilterCtxTests(
     @Test
     fun testFilterTagsByTagPerson() {
         assertThat(filterNames(createTagFilter(tagPerson))).containsExactlyInAnyOrder(
-            "'FranzMandl=Me",
+            "'Dad",
+            "'family",
+            "'FranzMandl=me",
             "'KeaganValencia",
             "'LandenKirk",
-            "'Me=FranzMandl",
+            "'me=FranzMandl",
         )
     }
 
@@ -263,7 +265,7 @@ class FilterCtxTests(
         val errors = mutableListOf<String>()
         val expected = (allItemPaths - setOf(
             "/example1/input1/2022/2022-11-22 - #FranzMandl.txt",
-            "/example1/input1/2022/2022-11-22 - #Me.txt",
+            "/example1/input1/2022/2022-11-22 - #me.txt",
             "/example1/input1/2022/2022-11-22 - #person.txt",
             "/example1/input1/2022/2022-11-22 - content.txt",
         )).map { SafePath(it) }

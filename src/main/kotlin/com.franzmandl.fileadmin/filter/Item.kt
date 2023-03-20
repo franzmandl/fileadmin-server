@@ -6,6 +6,7 @@ import java.util.*
 
 class Item(
     val inode: Inode,
+    val input: Input,
     val automaticTags: ItemTags,
     val contentTags: ItemTags,
     val nameTags: ItemTags,
@@ -21,10 +22,12 @@ class Item(
         fun create(
             registry: TagRegistry,
             inode: Inode,
-            automaticTags: ItemTags.Mutable,
+            input: Input,
             parentPathStartIndex: Int,
-            content: String?,
+            content: CharSequence?,
         ): Item {
+            val automaticTags = ItemTags.Mutable()
+            input.automaticTags.forEach { automaticTags.addTag(it, false) }
             val contentTags = createTags(registry, if (content != null) createContentStringRangeMap(content) else mapOf())
             val nameTags = createTags(registry, createStringRangeMap(inode.path.name, 0))
             val parentPathTags = createTags(registry, createStringRangeMap(inode.path.parent?.absoluteString ?: "", parentPathStartIndex))
@@ -39,6 +42,7 @@ class Item(
             }
             return Item(
                 inode,
+                input,
                 automaticTags,
                 contentTags,
                 nameTags,
@@ -47,7 +51,7 @@ class Item(
             )
         }
 
-        private fun createContentStringRangeMap(content: String): Map<String, List<StringRange<Boolean>>> =
+        private fun createContentStringRangeMap(content: CharSequence): Map<String, List<StringRange<Boolean>>> =
             createStringRangeMap(content.replace(FilterFileSystem.urlWithFragmentRegex) { FilterFileSystem.urlWithFragmentReplacementString.repeat(it.value.length) }, 0)
 
         private fun createStringRangeMap(value: String, startIndex: Int): Map<String, List<StringRange<Boolean>>> {
@@ -61,7 +65,7 @@ class Item(
         private fun createTags(registry: TagRegistry, names: Map<String, List<StringRange<Boolean>>>): ItemTags.Mutable {
             val tags = ItemTags.Mutable()
             for (name in names) {
-                val tag = registry.getOrCreateTag(name.value.firstOrNull()?.value ?: name.key, Tag.Parameter.default) { it.addParent(registry.tagUnknown) }
+                val tag = registry.getOrCreateTag(name.value.firstOrNull()?.value ?: name.key) { it.addParent(registry.tagUnknown) }
                 tags.addTag(tag, name.value.any { it.payload })
             }
             return tags

@@ -36,6 +36,8 @@ class FileResource(
             is Move -> CommonUtil.createJsonResponseEntity(FileHelper.applyMove(requestCtx, command))
             is Rename -> CommonUtil.createJsonResponseEntity(FileHelper.applyRename(requestCtx, command))
             is Share -> ResponseEntity(FileHelper.applyShare(requestCtx, command), CommonUtil.createJsonHttpHeaders(), HttpStatus.OK)
+            is ToDirectory -> CommonUtil.createJsonResponseEntity(FileHelper.applyToDirectory(requestCtx, command))
+            is ToFile -> CommonUtil.createJsonResponseEntity(FileHelper.applyToFile(requestCtx, command))
         }
     }
 

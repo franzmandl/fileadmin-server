@@ -23,22 +23,22 @@ object FileHelper {
         val path = command.path.resolve(PathUtil.validateName(command.newInode.name))
         val inode = ctx.getInode(path)
         inode.create(ctx, command.newInode.isFile)
-        inode.config.filter?.ctx?.scanItems(false, CommonUtil::noop)
+        inode.config.filter?.ctx?.scanItems(ctx, false, CommonUtil::noop)
         return getInodeModel(ctx, inode)
     }
 
     fun applyDelete(ctx: RequestCtx, command: Delete) {
         val inode = ctx.getInode(command.path)
         inode.delete(ctx)
-        inode.config.filter?.ctx?.scanItems(false, CommonUtil::noop)
+        inode.config.filter?.ctx?.scanItems(ctx, false, CommonUtil::noop)
     }
 
     fun applyMove(ctx: RequestCtx, command: Move): InodeModel {
         val oldInode = ctx.getInode(command.path)
         val newInode = ctx.getInode(command.newPath)
         oldInode.move(ctx, newInode)
-        oldInode.config.filter?.ctx?.scanItems(false, CommonUtil::noop)
-        newInode.config.filter?.ctx?.scanItems(false, CommonUtil::noop)
+        oldInode.config.filter?.ctx?.scanItems(ctx, false, CommonUtil::noop)
+        newInode.config.filter?.ctx?.scanItems(ctx, false, CommonUtil::noop)
         return getInodeModel(ctx, newInode)
     }
 
@@ -46,13 +46,64 @@ object FileHelper {
         val oldInode = ctx.getInode(command.path)
         val newInode = ctx.getInode(command.path.resolveSibling(PathUtil.validateName(command.newName)))
         oldInode.move(ctx, newInode)
-        newInode.config.filter?.ctx?.scanItems(false, CommonUtil::noop)
+        newInode.config.filter?.ctx?.scanItems(ctx, false, CommonUtil::noop)
         return getInodeModel(ctx, newInode)
     }
 
     fun applyShare(ctx: RequestCtx, command: Share): String {
         val inode = ctx.getInode(command.path)
         return inode.share(ctx, command.days)
+    }
+
+    fun applyToDirectory(ctx: RequestCtx, command: ToDirectory): InodeModel {
+        val oldFile = ctx.getInode(command.path)
+        val ending = command.path.name.lastIndexOf('.').let { index ->
+            if (index == -1 || index < command.path.name.length - 4) "" else command.path.name.substring(index, command.path.name.length)
+        }
+        val newDirectory = if (ending.isEmpty()) {
+            oldFile
+        } else {
+            ctx.getInode(command.path.resolveSibling(command.path.name.substring(0, command.path.name.length - ending.length)))
+        }
+        if (oldFile.sizeFile > 0) {
+            val readmeFile = ctx.getInode(newDirectory.path.resolve("readme$ending"))
+            val temporaryFile = ctx.getInode(oldFile.path.resolveSibling(oldFile.path.name + ".tmp"))
+            oldFile.move(ctx, temporaryFile)
+            newDirectory.create(ctx, false)
+            temporaryFile.move(ctx, readmeFile)
+        } else {
+            oldFile.delete(ctx)
+            newDirectory.create(ctx, false)
+        }
+        return getInodeModel(ctx, newDirectory)
+    }
+
+    fun applyToFile(ctx: RequestCtx, command: ToFile): InodeModel {
+        val oldDirectory = ctx.getInode(command.path)
+        val iterator = oldDirectory.children.iterator()
+        if (!iterator.hasNext()) {
+            oldDirectory.delete(ctx)
+            val newFile = ctx.getInode(oldDirectory.path.resolveSibling(oldDirectory.path.name + ".txt")).apply { create(ctx, true) }
+            return getInodeModel(ctx, newFile)
+        }
+        val oldFilePath = iterator.next()
+        if (iterator.hasNext()) {
+            throw HttpException.badRequest("Directory '${command.path}' has more than one child.")
+        }
+        val newFile = oldFilePath.name.lastIndexOf('.').let { index ->
+            if (index == -1 || index < oldFilePath.name.length - 4) {
+                oldDirectory
+            } else {
+                val ending = oldFilePath.name.substring(index, oldFilePath.name.length)
+                ctx.getInode(command.path.resolveSibling(command.path.name + ending))
+            }
+        }
+        val oldFile = ctx.getInode(oldFilePath)
+        val temporaryFile = ctx.getInode(oldDirectory.path.resolveSibling(oldDirectory.path.name + ".tmp"))
+        oldFile.move(ctx, temporaryFile)
+        oldDirectory.delete(ctx)
+        temporaryFile.move(ctx, newFile)
+        return getInodeModel(ctx, newFile)
     }
 
     fun getThumbnail(ctx: RequestCtx, path: SafePath, maxDimension: Int, responseHeaders: HttpHeaders): ByteArray {
@@ -154,6 +205,8 @@ object FileHelper {
         val operation = getOperationModel(inode)
         return InodeModel(
             error = error,
+            filterHighlightTags = inode.config.filterHighlightTags?.map { it.name },
+            filterOutputPath = inode.config.filter?.ctx?.output,
             friendlyName = friendlyName,
             isDirectory = inode.isDirectory,
             isFile = inode.isFile,
@@ -189,6 +242,8 @@ object FileHelper {
             canInodeMove = inode.treePermission.canInodeMove,
             canInodeRename = inode.treePermission.canInodeRename,
             canInodeShare = inode.contentPermission.canInodeShare,
+            canInodeToDirectory = inode.contentPermission.canInodeToDirectory,
+            canInodeToFile = inode.contentPermission.canInodeToFile,
         )
 
     private fun setResponseHeadersForFile(responseHeaders: HttpHeaders, inode: Inode) {

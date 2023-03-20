@@ -40,3 +40,15 @@ data class Share(
     val path: SafePath,
     val days: Int,
 ) : Command()
+
+@Serializable
+@SerialName("ToDirectory")
+data class ToDirectory(
+    val path: SafePath,
+) : Command()
+
+@Serializable
+@SerialName("ToFile")
+data class ToFile(
+    val path: SafePath,
+) : Command()

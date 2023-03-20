@@ -1,0 +1,7 @@
+{
+  "_type": "FilterVersion1",
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}

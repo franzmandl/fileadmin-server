@@ -1,6 +1,8 @@
 package com.franzmandl.fileadmin.filter
 
+import com.franzmandl.fileadmin.common.CommonUtil
 import com.franzmandl.fileadmin.common.HttpException
+import com.franzmandl.fileadmin.resource.RequestCtx
 import com.franzmandl.fileadmin.vfs.*
 import org.apache.commons.lang3.StringUtils
 import org.springframework.http.MediaType
@@ -16,86 +18,65 @@ class FilterFileSystem(
         val filterStrings = LinkedList<String>()
         val systemStrings = LinkedList<String>()
         splitRemaining(systemDirectoryName, remaining, filterStrings, systemStrings)
-        return if (systemStrings.isEmpty()) {
-            val result = ctx.filter(finder.destination, filterStrings, finder.ctx.errors::add)
-            result.children.add(finder.destination.resolve(systemDirectoryName))
-            VirtualDirectory.createFromFinder(finder, TagTreeOperation(this, result.canRename), result.children)
-        } else {
-            when (systemStrings) {
-                listOf(systemRoot) -> {
-                    ctx.scanItems(false, finder.ctx.errors::add)
+        val systemStringsIterator = systemStrings.iterator()
+        return when (CommonUtil.nextOrNull(systemStringsIterator)) {
+            null -> {
+                val result = ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx.errors::add)
+                finder.filterHighlightTags = result.getHighlightTags()
+                if (result.children.isNotEmpty()) {
+                    result.children.add(finder.destination.resolve(systemDirectoryName))
+                }
+                VirtualDirectory.createFromFinder(finder, TagTreeOperation(this, result.canRename), result.children)
+            }
+
+            systemRoot -> when (CommonUtil.nextOrNull(systemStringsIterator)) {
+                null -> {
+                    ctx.scanItems(finder.ctx.request, false, finder.ctx.errors::add)
                     VirtualDirectory.createFromFinderAndNames(
                         finder, VirtualDirectory.TreeOperation.Default, listOf(
-                            systemAllTags,
                             systemAllTagsTxt,
-                            systemCommonTags,
                             systemCommonTagsTxt,
-                            systemUnknownTags,
                             systemUnknownTagsJson,
                             systemUnknownTagsTxt,
-                            systemUnusedTags,
                             systemUnusedTagsTxt,
                         )
                     )
                 }
 
-                listOf(systemRoot, systemAllTags) ->
-                    VirtualDirectory.createFromFinderAndNames(
-                        finder, VirtualDirectory.TreeOperation.Default,
-                        getAllTags(finder.ctx.errors::add).map { it.name }
-                    )
-
-                listOf(systemRoot, systemAllTagsTxt) ->
+                systemAllTagsTxt ->
                     VirtualFile.createFromFinder(
                         finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getAllTags(finder.ctx.errors::add))
+                        collectPlainTagNames(getAllTags(finder.ctx))
                     )
 
-                listOf(systemRoot, systemCommonTags) ->
-                    VirtualDirectory.createFromFinderAndNames(
-                        finder, VirtualDirectory.TreeOperation.Default,
-                        ctx.filter(finder.destination, filterStrings, finder.ctx.errors::add).commonTags.map { it.name }
-                    )
-
-                listOf(systemRoot, systemCommonTagsTxt) ->
+                systemCommonTagsTxt ->
                     VirtualFile.createFromFinder(
                         finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(ctx.filter(finder.destination, filterStrings, finder.ctx.errors::add).commonTags)
+                        collectPlainTagNames(ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx.errors::add).commonTags)
                     )
 
-                listOf(systemRoot, systemUnknownTagsJson) ->
-                    VirtualDirectory.createFromFinderAndNames(
-                        finder, VirtualDirectory.TreeOperation.Default,
-                        getUnknownTags(finder.ctx.errors::add).map { it.name }
-                    )
-
-                listOf(systemRoot, systemUnknownTagsJson) ->
+                systemUnknownTagsJson ->
                     VirtualFile.createFromFinder(
                         finder, VirtualFile.TreeOperation.Default, MediaType.APPLICATION_JSON_VALUE,
-                        collectJsonTagNames(getUnknownTags(finder.ctx.errors::add))
+                        collectJsonTagNames(getUnknownTags(finder.ctx))
                     )
 
-                listOf(systemRoot, systemUnknownTagsTxt) ->
+                systemUnknownTagsTxt ->
                     VirtualFile.createFromFinder(
                         finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getUnknownTags(finder.ctx.errors::add))
+                        collectPlainTagNames(getUnknownTags(finder.ctx))
                     )
 
-                listOf(systemRoot, systemUnusedTags) ->
-                    VirtualDirectory.createFromFinderAndNames(
-                        finder, VirtualDirectory.TreeOperation.Default,
-                        getUnusedTags(finder.ctx.errors::add).map { it.name }
-                    )
-
-                listOf(systemRoot, systemUnusedTagsTxt) ->
+                systemUnusedTagsTxt ->
                     VirtualFile.createFromFinder(
                         finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getUnusedTags(finder.ctx.errors::add))
+                        collectPlainTagNames(getUnusedTags(finder.ctx))
                     )
 
-                else ->
-                    VirtualDirectory.createFromFinder(finder, TagTreeOperation(this, canRenameSystemStrings(systemStrings)), setOf())
+                else -> throw HttpException.badRequest("Illegal path: ${finder.destination}")
             }
+
+            else -> throw HttpException.badRequest("Illegal path: ${finder.destination}")
         }
     }
 
@@ -114,10 +95,6 @@ class FilterFileSystem(
         }
     }
 
-    private fun canRenameSystemStrings(systemStrings: List<String>): Boolean {
-        return (ctx.registry.getTag(systemStrings.lastOrNull() ?: return false) ?: return false).parameter.canRename
-    }
-
     private fun collectJsonTagNames(tags: Iterable<Tag>): ByteArray {
         val builder = StringBuilder().appendLine("  [")
         for (tag in tags.sortedBy(::sortSelector)) {
@@ -134,18 +111,18 @@ class FilterFileSystem(
         return builder.toString().toByteArray()
     }
 
-    private fun getAllTags(onError: (String) -> Unit): Iterable<Tag> {
-        ctx.scanItems(true, onError)
+    private fun getAllTags(pathFinderCtx: PathFinder.Ctx): Iterable<Tag> {
+        ctx.scanItems(pathFinderCtx.request, true, pathFinderCtx.errors::add)
         return ctx.registry.tags.values
     }
 
-    private fun getUnknownTags(onError: (String) -> Unit): Set<Tag> {
-        ctx.scanItems(true, onError)
+    private fun getUnknownTags(pathFinderCtx: PathFinder.Ctx): Set<Tag> {
+        ctx.scanItems(pathFinderCtx.request, true, pathFinderCtx.errors::add)
         return ctx.registry.tagUnknown.children
     }
 
-    private fun getUnusedTags(onError: (String) -> Unit): Set<Tag> {
-        val items = ctx.getSequenceOfItems(true, onError).toList()  // Materialize before calculating unusedTags.
+    private fun getUnusedTags(pathFinderCtx: PathFinder.Ctx): Set<Tag> {
+        val items = ctx.getSequenceOfItems(pathFinderCtx.request, true, pathFinderCtx.errors::add).toList()  // Materialize before calculating unusedTags.
         val unusedTags = ctx.registry.tags.values.toMutableSet()
         for (item in items) {
             unusedTags.removeAll(item.allTags.all)
@@ -153,8 +130,8 @@ class FilterFileSystem(
         return unusedTags
     }
 
-    fun requiresAction(onError: (String) -> Unit): Boolean {
-        for (item in ctx.getSequenceOfItems(true, onError)) {
+    fun requiresAction(requestCtx: RequestCtx, onError: (String) -> Unit): Boolean {
+        for (item in ctx.getSequenceOfItems(requestCtx, true, onError)) {
             if (ctx.registry.tagLostAndFound in item.allTags.all) {
                 return true
             }
@@ -183,14 +160,10 @@ class FilterFileSystem(
         val operatorRelationships = TagFilter.Relationship.values().associateBy { "relationship${it.name}" }
 
         const val systemRoot = ""
-        const val systemAllTags = "allTags"
         const val systemAllTagsTxt = "allTags.txt"
-        const val systemCommonTags = "commonTags"
         const val systemCommonTagsTxt = "commonTags.txt"
-        const val systemUnknownTags = "unknownTags"
         const val systemUnknownTagsJson = "unknownTags.json"
         const val systemUnknownTagsTxt = "unknownTags.txt"
-        const val systemUnusedTags = "unusedTags"
         const val systemUnusedTagsTxt = "unusedTags.txt"
 
         val tagNameRegex = Regex("(?:\\p{L}+|\\d+[\\p{L}_])[\\p{L}\\d_]*")

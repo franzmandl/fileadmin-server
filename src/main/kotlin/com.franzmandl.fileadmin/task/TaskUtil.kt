@@ -115,7 +115,7 @@ object TaskUtil {
                 if (inode.path != system.ctx.output) {
                     throw TaskException("[$original] Builtin error: Path is no filter output")
                 }
-                if (system.requiresAction { throw TaskException(it) }) ifTrue else maxDate
+                if (system.requiresAction(requestCtx) { throw TaskException(it) }) ifTrue else maxDate
             }
 
             "non_empty" -> {

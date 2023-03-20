@@ -1,8 +1,7 @@
 package com.franzmandl.fileadmin
 
 import com.franzmandl.fileadmin.common.JsonFormat
-import com.franzmandl.fileadmin.model.ApplicationCtx
-import com.franzmandl.fileadmin.model.Directory
+import com.franzmandl.fileadmin.model.*
 import com.franzmandl.fileadmin.resource.FileResource
 import com.franzmandl.fileadmin.vfs.SafePath
 import org.assertj.core.api.Assertions.assertThat
@@ -15,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -85,5 +85,37 @@ class IntegrationTests(
         val directory = JsonFormat.decodeFromString<Directory>(result.response.contentAsString)
         // Then
         assertThat(directory.errors).isEmpty()
+    }
+
+    @Test
+    fun testToDirectoryAndToFile() {
+        /// ToDirectory
+        // When
+        val toDirectoryResult =
+            mockMvc.perform(
+                post("${ApplicationCtx.RequestMappingPaths.authenticated}/command")
+                    .content(JsonFormat.encodeToString<Command>(ToDirectory(SafePath("/readme.txt"))))
+            )
+                .andExpect(status().isOk)
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andReturn()
+        val directory = JsonFormat.decodeFromString<InodeModel>(toDirectoryResult.response.contentAsString)
+        // Then
+        assertThat(directory.isDirectory).isTrue
+        assertThat(directory.path.name).isEqualTo("readme")
+        /// ToFile
+        // When
+        val toFileResult =
+            mockMvc.perform(
+                post("${ApplicationCtx.RequestMappingPaths.authenticated}/command")
+                    .content(JsonFormat.encodeToString<Command>(ToFile(SafePath("/readme"))))
+            )
+                .andExpect(status().isOk)
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andReturn()
+        val file = JsonFormat.decodeFromString<InodeModel>(toFileResult.response.contentAsString)
+        // Then
+        assertThat(file.isFile).isTrue
+        assertThat(file.path.name).isEqualTo("readme.txt")
     }
 }

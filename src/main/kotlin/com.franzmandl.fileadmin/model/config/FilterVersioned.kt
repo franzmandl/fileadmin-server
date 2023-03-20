@@ -29,6 +29,7 @@ sealed class InputVersioned {
 @SerialName("InputVersion1")
 data class InputVersion1(
     val automaticInputTag: Boolean? = null,
+    val automaticTags: List<String>? = null,
     val comment: String? = null,
     val condition: ConditionVersioned? = null,
     val contentCondition: ConditionVersioned? = null,
@@ -70,7 +71,9 @@ data class TagVersion1(
     val canRename: Boolean? = null,
     val children: List<TagVersioned?>? = null,
     val comment: String? = null,
+    val parents: List<String>? = null,
     val priority: Int? = null,
+    val spread: Boolean? = null,
 ) : TagVersioned() {
     override fun toLatestVersion(): TagVersion1 = this
 }

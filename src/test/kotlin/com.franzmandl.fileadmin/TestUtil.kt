@@ -1,6 +1,7 @@
 package com.franzmandl.fileadmin
 
 import com.franzmandl.fileadmin.filter.FilterFileSystem
+import com.franzmandl.fileadmin.filter.Tag
 import com.franzmandl.fileadmin.model.NewInode
 import com.franzmandl.fileadmin.vfs.Inode
 import com.franzmandl.fileadmin.vfs.NativeInode
@@ -36,6 +37,7 @@ object TestUtil {
     private object NativeInodeConfig : Inode.Config {
         override val errors: List<String> = listOf()
         override val filter: FilterFileSystem? = null
+        override var filterHighlightTags: Set<Tag>? = null
         override val isRunLast: Boolean = false
         override val isTask: Boolean = false
         override val nameCursorPosition: Int = 0
