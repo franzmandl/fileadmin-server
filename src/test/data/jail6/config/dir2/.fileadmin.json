@@ -1,0 +1,4 @@
+{
+  "_type": "DirectoryVersion1",
+  "imports": ["../dir1"]
+}

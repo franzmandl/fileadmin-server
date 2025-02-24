@@ -1,4 +1,5 @@
 /.gradle
 /.idea
+/.kotlin
 /build
 /src/main/java/com/franzmandl/fileadmin/generated

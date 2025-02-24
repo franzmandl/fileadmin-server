@@ -1,7 +1,0 @@
-Maecenas ultricies [Markup Validation Service](https://validator.w3.org/) mi eget mauris.
-Ac tortor dignis sim [TypeScript	Playground](https://www.typescriptlang.org/play) convallis aenean [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) et tortor.
-Sit amet justo donec enim diam vulputate ut.
-Viverra vitae [relative newLine01.txt](newLine01.txt) congue eu consequat ac.
-Ornare lectus sit amet est [caniuse](https://caniuse.com/) placerat in egestas erat imperdiet.
-Lectus vestibulum [mail](mailto:hallo@domain.test) mattis ullamcorper velit sed ullamcorper morbi.
-A diam sollicitudin tempor id.

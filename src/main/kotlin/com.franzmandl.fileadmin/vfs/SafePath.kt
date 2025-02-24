@@ -14,26 +14,25 @@ import java.util.*
 /**
  * Is a relative path to some root directory.
  * Is separated by separatorChar.
- * Does not contain '.' or '..'.
+ * Does not contain "." or "..".
  * Never starts or ends with separatorChar.
- * A serialized safe path is a string with a leading '/' and therefore appears absolute.
+ * A serialized safe path is a string with a leading "/" and therefore appears absolute.
  * Example: paths from URL
  */
 @Serializable(with = SafePath.Serializer::class)
 data class SafePath(
     val parts: List<String>,
-) {
+) : Comparable<SafePath> {
     constructor(string: String) : this(validateString(string))
 
     val absoluteString = "/" + parts.joinToString("/")
-    val array = parts.toTypedArray()
     val relativeString = parts.joinToString(File.separator)
 
     fun forceParent(): SafePath =
-        parent ?: throw IllegalStateException("Parent was null.")
+        parent ?: error("Parent was null.")
 
     fun forceResolve(path: UnsafePath): SafePath =
-        resolve(path) ?: throw HttpException.badRequest("Illegal path: '$path' breaks out of jail.")
+        resolve(path) ?: throw HttpException.badRequest("""Illegal path: "$path" breaks out of jail.""")
 
     val isRoot: Boolean
         get() = parts.isEmpty()
@@ -74,13 +73,11 @@ data class SafePath(
         if (names.isEmpty()) this else SafePath(parts + names)
 
     /**
-     * @param names Must already have been validated.
+     * @param name Must already have been validated.
      */
     fun resolveSibling(name: String): SafePath =
         SafePath(LinkedList(parts).apply {
-            if (isEmpty()) {
-                throw IllegalStateException("Parts are empty.")
-            }
+            check(isNotEmpty()) { "Parts are empty." }
             set(lastIndex, name)
         })
 
@@ -96,6 +93,16 @@ data class SafePath(
         return true
     }
 
+    /**
+     * Check before if this starts with prefix.
+     */
+    fun sliceParts(prefix: SafePath): List<String> = sliceParts(prefix.parts)
+    fun sliceParts(prefixParts: Collection<String>): List<String> = sliceParts(prefixParts.size)
+    private fun sliceParts(prefixSize: Int): List<String> = parts.subList(prefixSize, parts.size)
+
+    override fun compareTo(other: SafePath): Int =
+        relativeString.compareTo(other.relativeString)
+
     override fun toString(): String =
         absoluteString
 
@@ -106,17 +113,18 @@ data class SafePath(
     }
 
     companion object {
-        private val antiRegex = Regex("^$|^[^${PathUtil.separator.pattern}]|[${PathUtil.separator.pattern}]\\.{1,2}[${PathUtil.separator.pattern}]|[${PathUtil.separator.pattern}]\\.{1,2}$")
+        private val antiRegex =
+            Regex("""^$|^[^${PathUtil.separator.pattern}]|[${PathUtil.separator.pattern}]\.{1,2}[${PathUtil.separator.pattern}]|[${PathUtil.separator.pattern}]\.{1,2}$""")
 
         private fun validateString(string: String): List<String> {
             val slashString = PathUtil.separator.replaceTo(string)
             if (antiRegex.containsMatchIn(slashString)) {
-                throw HttpException.badRequest("Illegal path: '$string' matches anti pattern.")
+                throw HttpException.badRequest("""Illegal path: "$string" matches anti pattern.""")
             }
             val localPath = Path.of(PathUtil.separator.replaceFrom(slashString.trim('/')))
             if (localPath.isAbsolute) {
                 // Might happen on Windows.
-                throw HttpException.badRequest("Illegal path: '$string' is absolute.")
+                throw HttpException.badRequest("""Illegal path: "$string" is absolute.""")
             }
             return splitLocalPath(localPath)
         }

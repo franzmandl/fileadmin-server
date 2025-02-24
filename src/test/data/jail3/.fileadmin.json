@@ -1,0 +1,10 @@
+{
+  "_type": "FilterVersion1",
+  "input": [
+    {"_type": "InputVersion1", "path": "sort01", "condition": {"_type": "SimplePathConditionVersion1", "whitelist": ["2022-03-04.txt"], "time": true}},
+  null],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}

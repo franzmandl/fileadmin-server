@@ -1,8 +1,8 @@
 package com.franzmandl.fileadmin.vfs
 
 class Link(
-    val realTargetInode: Inode,
+    val realTargetInode: Inode0,
     val target: UnsafePath,
-    val targetInode: Inode,
+    val targetInode: Inode1<*>,
     private val treeInode: TreeInode,
-) : Inode, ContentInode by realTargetInode, TreeInode by treeInode
+) : Inode0, ContentInode by realTargetInode, TreeInode by treeInode

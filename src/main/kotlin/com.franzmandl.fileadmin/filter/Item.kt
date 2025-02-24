@@ -1,74 +1,107 @@
 package com.franzmandl.fileadmin.filter
 
 import com.franzmandl.fileadmin.common.CommonUtil
-import com.franzmandl.fileadmin.vfs.Inode
-import java.util.*
+import com.franzmandl.fileadmin.common.ErrorHandler
+import com.franzmandl.fileadmin.vfs.Inode1
+import java.time.LocalDate
 
 class Item(
-    val inode: Inode,
+    val inode: Inode1<*>,
     val input: Input,
     val automaticTags: ItemTags,
+    val contentConsecutiveTags: List<List<Tag>>,
     val contentTags: ItemTags,
+    val hasContent: Boolean,
+    val nameConsecutiveTags: List<List<Tag>>,
     val nameTags: ItemTags,
+    val parentPathConsecutiveTags: List<List<Tag>>,
     val parentPathTags: ItemTags,
     val parentPathStartIndex: Int,
+    val time: LocalDate?,
 ) {
+    val automaticConsecutiveTags = automaticTags.all.map { listOf(it) }
+    val anyConsecutiveTags: List<List<Tag>> = CommonUtil.concatenate(contentConsecutiveTags, nameConsecutiveTags, automaticConsecutiveTags, parentPathConsecutiveTags)
     val allTags: ItemTags = ItemTags.Mutable().addAll(automaticTags).addAll(contentTags).addAll(nameTags).addAll(parentPathTags)
-    val time = CommonUtil.parseDate(inode.path.name)
 
-    override fun toString(): String = "Item:${inode.path} $allTags"
+    override fun toString(): String = "Item:${inode.inode0.path} $allTags"
 
     companion object {
         fun create(
-            registry: TagRegistry,
-            inode: Inode,
+            registry: TagRegistry.Phase2,
+            inode: Inode1<*>,
+            inodeTag: Tag?,
             input: Input,
             parentPathStartIndex: Int,
-            content: CharSequence?,
+            getContent: () -> CharSequence,
+            errorHandler: ErrorHandler,
+            time: LocalDate?,
         ): Item {
             val automaticTags = ItemTags.Mutable()
-            input.automaticTags.forEach { automaticTags.addTag(it, false) }
-            val contentTags = createTags(registry, if (content != null) createContentStringRangeMap(content) else mapOf())
-            val nameTags = createTags(registry, createStringRangeMap(inode.path.name, 0))
-            val parentPathTags = createTags(registry, createStringRangeMap(inode.path.parent?.absoluteString ?: "", parentPathStartIndex))
-            if (contentTags.all.isEmpty() && nameTags.all.isEmpty() && parentPathTags.all.isEmpty()) {
-                automaticTags.addTag(registry.tagLostAndFound, false)
+            inodeTag?.let { automaticTags.addTag(it) }
+            input.automaticTags.forEach { automaticTags.addTag(it) }
+            val nameTags = ItemTags.Mutable()
+            val nameConsecutiveTags = if (input.scanNameForTags) {
+                getSequenceOfConsecutiveTags(registry, nameTags, inode.inode0.path.name, 0, errorHandler).toList()
+            } else listOf()
+            val scanContentForTags = registry.systemTags.prune !in nameTags.all
+            val contentTags = ItemTags.Mutable()
+            val contentConsecutiveTags = if (scanContentForTags) {
+                getSequenceOfConsecutiveTags(registry, contentTags, FilterFileSystem.replaceUrlsWithFragment(getContent()), 0, errorHandler).toList()
+            } else listOf()
+            val parentPathTags = ItemTags.Mutable()
+            val parentPathConsecutiveTags = if (input.scanParentPathForTags) {
+                getSequenceOfConsecutiveTags(registry, parentPathTags, inode.inode0.path.parent?.absoluteString ?: "", parentPathStartIndex, errorHandler).toList()
+            } else listOf()
+            if (input.lostAndFound != null && contentTags.all.isEmpty() && nameTags.all.isEmpty() && parentPathTags.all.isEmpty()) {
+                automaticTags.addTag(input.lostAndFound)
             }
-            if (inode.isDirectory) {
-                automaticTags.addTag(registry.tagDirectory, false)
+            if (scanContentForTags && contentTags.all.isEmpty()) {
+                contentTags.addTag(registry.systemTags.emptyContent)
             }
-            if (inode.isFile) {
-                automaticTags.addTag(registry.tagFile, false)
+            if (nameTags.all.isEmpty() || registry.pruneSystemTags.containsAll(nameTags.all)) {
+                nameTags.addTag(registry.systemTags.emptyName)
+            }
+            if (parentPathTags.all.isEmpty()) {
+                parentPathTags.addTag(registry.systemTags.emptyParentPath)
+            }
+            if (inode.inode0.isDirectory) {
+                automaticTags.addTag(registry.systemTags.directory)
+            }
+            if (inode.inode0.isFile) {
+                automaticTags.addTag(registry.systemTags.file)
             }
             return Item(
                 inode,
                 input,
                 automaticTags,
+                contentConsecutiveTags,
                 contentTags,
+                scanContentForTags,
+                nameConsecutiveTags,
                 nameTags,
+                parentPathConsecutiveTags,
                 parentPathTags,
                 parentPathStartIndex,
+                time,
             )
         }
 
-        private fun createContentStringRangeMap(content: CharSequence): Map<String, List<StringRange<Boolean>>> =
-            createStringRangeMap(content.replace(FilterFileSystem.urlWithFragmentRegex) { FilterFileSystem.urlWithFragmentReplacementString.repeat(it.value.length) }, 0)
-
-        private fun createStringRangeMap(value: String, startIndex: Int): Map<String, List<StringRange<Boolean>>> {
-            val stringRangeMap = mutableMapOf<String, MutableList<StringRange<Boolean>>>()
-            TagVisitor.visit(value, startIndex) { stringRange ->
-                stringRangeMap.computeIfAbsent(stringRange.value) { LinkedList() }.add(stringRange)
+        private fun getSequenceOfConsecutiveTags(
+            registry: TagRegistry,
+            tags: ItemTags.Mutable,
+            value: String,
+            startIndex: Int,
+            errorHandler: ErrorHandler
+        ): Sequence<List<Tag.Mutable>> =
+            FilterFileSystem.getSequenceOfConsecutiveTagNames(value, startIndex).map { stringRanges ->
+                stringRanges.map { stringRange ->
+                    val tag = registry.getOrCreateTag(stringRange.value, Tag.Parameter.placeholder, errorHandler) {
+                        it.addParent(registry.systemTags.unknown, false)
+                        it.parameter = Tag.Parameter.standard
+                    }
+                    tags.addTag(tag)
+                    tag
+                }
             }
-            return stringRangeMap
-        }
-
-        private fun createTags(registry: TagRegistry, names: Map<String, List<StringRange<Boolean>>>): ItemTags.Mutable {
-            val tags = ItemTags.Mutable()
-            for (name in names) {
-                val tag = registry.getOrCreateTag(name.value.firstOrNull()?.value ?: name.key) { it.addParent(registry.tagUnknown) }
-                tags.addTag(tag, name.value.any { it.payload })
-            }
-            return tags
-        }
     }
 }

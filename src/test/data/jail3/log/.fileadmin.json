@@ -1,0 +1,10 @@
+{
+  "_type": "DirectoryValueVersion1",
+  "condition": {"_type": "SimplePathConditionVersion1", "minDepth": 1},
+  "nameCursorPosition": 16,
+  "newInodeTemplate": {
+    "_type": "NewInodeVersion1",
+    "isFile": true,
+    "name": "<nowMinute>.txt"
+  }
+}

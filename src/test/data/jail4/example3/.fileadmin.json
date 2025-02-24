@@ -1,0 +1,17 @@
+{
+  "_type": "FilterVersion1",
+  "input": [
+    {"_type": "InputVersion1", "path": "input1",
+      "pruneNames": ["pruneName"],
+      "condition": {"_type": "SimplePathConditionVersion1", "time": true}
+    },
+    {"_type": "InputVersion1", "path": "input2",
+      "pruneNames": ["pruneName"],
+      "condition": {"_type": "SimplePathConditionVersion1", "minDepth": 1, "time": true}
+    }
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}

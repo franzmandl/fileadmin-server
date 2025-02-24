@@ -1,4 +1,0 @@
-{
-  "_type": "RunLastVersion1",
-  "condition": {"_type": "ConditionVersion1", "nameGlob": "*.txt", "minDepth": 1}
-}

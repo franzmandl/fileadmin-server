@@ -20,6 +20,7 @@ class HttpException(
         fun notSupportedParent(): BuilderStart = Builder("Parent does not support.")
         fun processError(message: String): BuilderStart = Builder("Process error: $message")
         fun processTimeout(): BuilderStart = Builder("Process timeout.")
+        fun sameTarget(): BuilderStart = Builder("Target is the same.")
     }
 
     interface BuilderStart {
@@ -29,10 +30,10 @@ class HttpException(
         fun delete(value: SafePath): BuilderEnd
         fun getFile(value: SafePath): BuilderEnd
         fun lastModified(value: SafePath): BuilderEnd
-        fun mimeType(value: SafePath): BuilderEnd
         fun move(value: SafePath): BuilderTo
         fun setFile(value: SafePath): BuilderEnd
-        fun sizeFile(value: SafePath): BuilderEnd
+        fun sizeOfDirectory(value: SafePath): BuilderEnd
+        fun sizeOfFile(value: SafePath): BuilderEnd
         fun share(value: SafePath): BuilderEnd
         fun stream(value: SafePath): BuilderEnd
     }
@@ -66,17 +67,17 @@ class HttpException(
         override fun lastModified(value: SafePath): Builder =
             appendAction("get last modified", value)
 
-        override fun mimeType(value: SafePath): Builder =
-            appendAction("get mime type", value)
-
         override fun move(value: SafePath): Builder =
             appendAction("move", value)
 
         override fun setFile(value: SafePath): Builder =
             appendAction("set file", value)
 
-        override fun sizeFile(value: SafePath): Builder =
-            appendAction("get file size", value)
+        override fun sizeOfDirectory(value: SafePath): Builder =
+            appendAction("get size of directory", value)
+
+        override fun sizeOfFile(value: SafePath): Builder =
+            appendAction("get size of file", value)
 
         override fun share(value: SafePath): Builder =
             appendAction("share", value)

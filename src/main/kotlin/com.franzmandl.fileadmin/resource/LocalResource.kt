@@ -2,7 +2,8 @@ package com.franzmandl.fileadmin.resource
 
 import com.franzmandl.fileadmin.common.CommonUtil
 import com.franzmandl.fileadmin.common.HttpException
-import com.franzmandl.fileadmin.model.ApplicationCtx
+import com.franzmandl.fileadmin.common.VersionInfo
+import com.franzmandl.fileadmin.dto.ApplicationCtx
 import com.franzmandl.fileadmin.task.TaskCtx
 import com.franzmandl.fileadmin.task.TaskException
 import org.springframework.beans.factory.annotation.Autowired
@@ -14,29 +15,32 @@ import org.springframework.web.bind.annotation.RequestMethod
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseBody
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.LocalDateTime
 
 @Controller
 class LocalResource(
     @Autowired private val applicationCtx: ApplicationCtx
 ) : BaseResource() {
+    @RequestMapping(value = [ApplicationCtx.RequestMappingPaths.Local.ping], method = [RequestMethod.GET])
+    @ResponseBody
+    fun getPing(): ResponseEntity<String> =
+        ResponseEntity("${VersionInfo.banner}\n${LocalDateTime.now()}\n", CommonUtil.createContentTypePlainUtf8HttpHeaders(), HttpStatus.OK)
+
     @RequestMapping(value = [ApplicationCtx.RequestMappingPaths.Local.task], method = [RequestMethod.GET])
     @ResponseBody
     fun getTask(
-        @RequestParam(name = "start") startString: String,
-        @RequestParam(name = "now") nowString: String,
+        @RequestParam @IsoDateFormat start: LocalDate,
+        @RequestParam @IsoDateFormat now: LocalDate,
     ): ResponseEntity<String> {
-        val start = LocalDate.parse(startString, DateTimeFormatter.ISO_LOCAL_DATE)
-        val now = LocalDate.parse(nowString, DateTimeFormatter.ISO_LOCAL_DATE)
-        val requestCtx = applicationCtx.createRequestCtx()
+        val mailPath = applicationCtx.task.mailPath ?: throw HttpException.badRequest("taskMail is null.")
+        val requestCtx = applicationCtx.createRequestCtx(now)
         val stringBuilder = StringBuilder()
-        val taskMailDirectory = requestCtx.getInode(applicationCtx.paths.taskMail ?: throw HttpException.badRequest("taskMail is null."))
-        for (projectDirectory in CommonUtil.getSequenceOfChildren(requestCtx, taskMailDirectory)) {
-            if (!projectDirectory.contentOperation.canDirectoryGet) {
+        for (projectDirectory in CommonUtil.getSequenceOfChildren(requestCtx, requestCtx.getInode(mailPath))) {
+            if (!projectDirectory.inode0.contentOperation.canDirectoryGet) {
                 continue
             }
             for (statusDirectory in CommonUtil.getSequenceOfChildren(requestCtx, projectDirectory)) {
-                if (!statusDirectory.contentOperation.canDirectoryGet) {
+                if (!statusDirectory.inode0.contentOperation.canDirectoryGet) {
                     continue
                 }
                 val tasks = CommonUtil.getSequenceOfChildren(requestCtx, statusDirectory).toList()
@@ -45,11 +49,11 @@ class LocalResource(
                     try {
                         val taskDate = taskCtx.registry.getOrCreateTaskDate(task)
                         val taskLastModified = taskDate.getLastModified()
-                        if (start <= taskDate.date && taskDate.date <= now && (taskLastModified != now || taskLastModified == null)) {
-                            stringBuilder.appendLine("task/${projectDirectory.path.name}/${statusDirectory.path.name}/${task.path.name}").appendLine()
+                        if (taskDate.date in start..now && taskLastModified != now) {
+                            stringBuilder.appendLine("task/${projectDirectory.inode0.path.name}/${statusDirectory.inode0.path.name}/${task.inode0.path.name}").appendLine()
                         }
                     } catch (e: TaskException) {
-                        stringBuilder.appendLine(task.toString()).appendLine(e).appendLine()
+                        stringBuilder.appendLine(task.inode0.path.absoluteString).appendLine(e).appendLine()
                     }
                 }
             }

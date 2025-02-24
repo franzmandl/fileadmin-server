@@ -1,0 +1,12 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["../dir4", "input1/brokenSymbolicLink/doesNotExist"],
+  "input": [
+    {"_type": "InputVersion1", "path": "input1"},
+    {"_type": "InputVersion1", "path": "input1/brokenSymbolicLink/doesNotExist/doesNotExist"}
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}

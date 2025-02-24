@@ -30,7 +30,7 @@ exprTrigger : id ('(' args? ')' time? effective? priority? repeat? | ' ' (effect
 args : arg (' '+ arg)*;
 arg : string | '{' trigger '}' | QUOTED_STRING;
 
-time : (' ' (TIME_HH_MM | TIME_HH_MM_SS));
+time : (' ' (DIGITS | TIME_HH_MM | TIME_HH_MM_SS));
 effective : 'E' negative='-'? (periodYearsMonthsDays | periodWeeks?);
 priority : 'P' negative='-'? value=DIGITS;
 repeat : 'R' exclm='!'? (periodYearsMonthsDays | periodWeeks?);

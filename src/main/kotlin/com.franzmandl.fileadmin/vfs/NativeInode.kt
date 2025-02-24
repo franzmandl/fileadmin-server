@@ -21,11 +21,9 @@ import kotlin.io.path.*
 
 class NativeInode(
     private val localPath: Path,
-    override val parent: OptionalValue<InodeWithoutConfig>,
+    override val parent: OptionalValue<Inode0>,
     override val path: SafePath,
-    private val stepchildren: Set<SafePath>,
-    override val config: Inode.Config,
-) : Inode {
+) : Inode0 {
     private val operation = Operation(this)
     private val permission = Permission(this)
     val publicLocalPath = localPath
@@ -44,7 +42,7 @@ class NativeInode(
 
     override val children: Set<SafePath>
         get() = try {
-            localPath.useDirectoryEntries { sequence -> sequence.mapTo(mutableSetOf<SafePath>().apply { addAll(stepchildren) }) { path.resolve(it.name) } }
+            localPath.useDirectoryEntries { sequence -> sequence.map { path.resolve(it.name) }.toSet() }
         } catch (_: AccessDeniedException) {
             throw HttpException.notAllowed().children(path).build()
         } catch (_: NoSuchFileException) {
@@ -53,34 +51,38 @@ class NativeInode(
             throw HttpException.notSupported().children(path).build()
         }
 
-    val childrenCount
-        get(): Int? = try {
+    val childrenCount: Int?
+        get() = try {
             localPath.useDirectoryEntries { sequence -> sequence.count() }
         } catch (_: FileSystemException) {
             null
         }
 
-    override val contentOperation: Inode.ContentOperation = operation
-    override val contentPermission: Inode.ContentOperation = permission
+    override val contentOperation: ContentInode.Operation = operation
+    override val contentPermission: ContentInode.Operation = permission
 
-    override fun copy(ctx: RequestCtx, target: Inode) {
-        when (target) {
-            is NativeInode ->
+    override fun copy(ctx: RequestCtx, target: Inode1<*>) {
+        when (target.inode0) {
+            is NativeInode -> {
+                if (localPath == target.inode0.localPath) {
+                    throw HttpException.sameTarget().copy(path).to(target.inode0.path).build()
+                }
                 try {
-                    localPath.copyTo(target.localPath)
+                    localPath.copyTo(target.inode0.localPath)
                 } catch (e: AccessDeniedException) {
                     throw (if (e.file == localPath.toString()) HttpException.notAllowed() else HttpException.notAllowedDestination())
-                        .copy(path).to(target.path).build()
+                        .copy(path).to(target.inode0.path).build()
                 } catch (_: FileAlreadyExistsException) {
-                    throw HttpException.alreadyExists().copy(path).to(target.path).build()
+                    throw HttpException.alreadyExists().copy(path).to(target.inode0.path).build()
                 } catch (_: FileSystemException) {
-                    throw HttpException.notSupportedParent().copy(path).to(target.path).build()
+                    throw HttpException.notSupportedParent().copy(path).to(target.inode0.path).build()
                 } catch (e: NoSuchFileException) {
                     throw (if (e.file == localPath.toString()) HttpException.notExists() else HttpException.notExistsParent())
-                        .copy(path).to(target.path).build()
+                        .copy(path).to(target.inode0.path).build()
                 }
+            }
 
-            else -> throw HttpException.notSupported().copy(path).to(target.path).build()
+            else -> throw HttpException.notSupported().copy(path).to(target.inode0.path).build()
         }
     }
 
@@ -112,7 +114,7 @@ class NativeInode(
         }
     }
 
-    val exists: Boolean get() = localPath.exists()
+    val exists: Boolean get() = localPath.exists(LinkOption.NOFOLLOW_LINKS) // Makes broken symlink to exist.
 
     override val inputStream: InputStream
         get() = try {
@@ -151,32 +153,36 @@ class NativeInode(
 
     val linkTarget: UnsafePath get() = UnsafePath(localPath.readSymbolicLink())
 
-    override val mimeType: String
-        get() =
-            try {
-                CommonUtil.getMimeType(localPath)
-            } catch (_: IOException) {
-                MediaType.TEXT_PLAIN_VALUE
-            }
+    override val mimeType: String by lazy {
+        try {
+            CommonUtil.getMimeType(localPath)
+        } catch (_: IOException) {
+            MediaType.TEXT_PLAIN_VALUE
+        }
+    }
 
-    override fun move(ctx: RequestCtx, target: Inode) {
-        when (target) {
-            is NativeInode ->
+    override fun move(ctx: RequestCtx, target: Inode1<*>) {
+        when (target.inode0) {
+            is NativeInode -> {
+                if (localPath == target.inode0.localPath) {
+                    throw HttpException.sameTarget().move(path).to(target.inode0.path).build()
+                }
                 try {
-                    localPath.moveTo(target.localPath)
+                    localPath.moveTo(target.inode0.localPath)
                 } catch (e: AccessDeniedException) {
                     throw (if (e.file == localPath.toString()) HttpException.notAllowed() else HttpException.notAllowedDestination())
-                        .move(path).to(target.path).build()
+                        .move(path).to(target.inode0.path).build()
                 } catch (_: FileAlreadyExistsException) {
-                    throw HttpException.alreadyExists().move(path).to(target.path).build()
+                    throw HttpException.alreadyExists().move(path).to(target.inode0.path).build()
                 } catch (_: FileSystemException) {
-                    throw HttpException.notSupportedParent().move(path).to(target.path).build()
+                    throw HttpException.notSupportedParent().move(path).to(target.inode0.path).build()
                 } catch (e: NoSuchFileException) {
                     throw (if (e.file == localPath.toString()) HttpException.notExists() else HttpException.notExistsParent())
-                        .move(path).to(target.path).build()
+                        .move(path).to(target.inode0.path).build()
                 }
+            }
 
-            else -> throw HttpException.notSupported().move(path).to(target.path).build()
+            else -> throw HttpException.notSupported().move(path).to(target.inode0.path).build()
         }
     }
 
@@ -189,13 +195,24 @@ class NativeInode(
             throw HttpException.notExists().setFile(path).build()
         }
 
-    override val sizeFile: Long
+    override val sizeOfDirectory: Int
+        get() = try {
+            localPath.useDirectoryEntries { sequence -> sequence.count() }
+        } catch (_: AccessDeniedException) {
+            throw HttpException.notAllowed().sizeOfDirectory(path).build()
+        } catch (_: NoSuchFileException) {
+            throw HttpException.notExists().sizeOfDirectory(path).build()
+        } catch (_: NotDirectoryException) {
+            throw HttpException.notSupported().sizeOfDirectory(path).build()
+        }
+
+    override val sizeOfFile: Long
         get() = try {
             localPath.fileSize()
         } catch (_: AccessDeniedException) {
-            throw HttpException.notAllowed().sizeFile(path).build()
+            throw HttpException.notAllowed().sizeOfFile(path).build()
         } catch (_: NoSuchFileException) {
-            throw HttpException.notExists().sizeFile(path).build()
+            throw HttpException.notExists().sizeOfFile(path).build()
         }
 
     override fun stream(requestHeaders: HttpHeaders, responseHeaders: HttpHeaders): ResponseEntity<ResourceRegion> =
@@ -240,7 +257,7 @@ class NativeInode(
         val processResult =
             ProcessResult.create(
                 ProcessBuilder(
-                    ctx.application.binaries.share,
+                    ctx.application.share.binaryPath,
                     "--days",
                     days.toString(),
                     "--format",
@@ -266,8 +283,8 @@ class NativeInode(
 
     override fun toString(): String = localPath.toString()
 
-    override val treeOperation: Inode.TreeOperation = operation
-    override val treePermission: Inode.TreeOperation = permission
+    override val treeOperation: TreeInode.Operation = operation
+    override val treePermission: TreeInode.Operation = permission
 
     companion object {
         private const val resourceRegionMaxRangeCount = 10L * 1024L * 1024L
@@ -279,7 +296,7 @@ class NativeInode(
 
         private class Operation(
             private val inode: NativeInode,
-        ) : Inode.ContentOperation, Inode.TreeOperation {
+        ) : ContentInode.Operation, TreeInode.Operation {
             override val canDirectoryAdd: Boolean get() = inode.isDirectory  // Implies exists.
             override val canDirectoryGet: Boolean get() = inode.isDirectory  // Implies exists.
             override val canFileGet: Boolean get() = inode.isFile  // Implies exists.
@@ -296,7 +313,7 @@ class NativeInode(
 
         private class Permission(
             private val inode: NativeInode,
-        ) : Inode.ContentOperation, Inode.TreeOperation {
+        ) : ContentInode.Operation, TreeInode.Operation {
             override val canDirectoryAdd: Boolean get() = inode.operation.canDirectoryAdd && inode.canWrite
             override val canDirectoryGet: Boolean get() = inode.operation.canDirectoryGet && inode.canRead
             override val canFileGet: Boolean get() = inode.operation.canFileGet && inode.canRead

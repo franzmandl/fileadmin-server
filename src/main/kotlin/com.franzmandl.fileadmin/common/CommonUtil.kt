@@ -1,14 +1,15 @@
 package com.franzmandl.fileadmin.common
 
 import com.franzmandl.fileadmin.resource.RequestCtx
-import com.franzmandl.fileadmin.vfs.Inode
-import com.franzmandl.fileadmin.vfs.InodeWithoutConfig
-import com.franzmandl.fileadmin.vfs.PathFinder
+import com.franzmandl.fileadmin.vfs.HasChildren
+import com.franzmandl.fileadmin.vfs.Inode1
 import org.apache.tika.Tika
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
@@ -18,13 +19,17 @@ import java.security.SecureRandom
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.io.path.isDirectory
 
 object CommonUtil {
     val contentTypeTextPlainUtf8 = appendCharset(MediaType.TEXT_PLAIN_VALUE)
+
+    /** Inclusive dot. */
+    const val maxFileEndingLength = 5
     private val random = SecureRandom()
     private val tika = Tika()
     private const val wildcard = "*"
-    private val wildcardGlob = createGlob(wildcard)
+    private val wildcardGlob = createGlobHelper(wildcard)
     val yyyy_MM_dd_HH_mm_ss_SSS_format: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
     fun appendCharset(mimeType: String): String =
@@ -41,8 +46,11 @@ object CommonUtil {
         return httpHeaders
     }
 
+    private fun createGlobHelper(pattern: String): PathMatcher =
+        FileSystems.getDefault().getPathMatcher("glob:$pattern")
+
     fun createGlob(pattern: String): PathMatcher =
-        if(pattern == wildcard) wildcardGlob else FileSystems.getDefault().getPathMatcher("glob:$pattern")
+        if (pattern == wildcard) wildcardGlob else createGlobHelper(pattern)
 
     fun createSecureRandomString(bytesCount: Int): String {
         val bytes = ByteArray(bytesCount)
@@ -58,8 +66,10 @@ object CommonUtil {
         return result
     }
 
+    const val mimeTypeDirectory = "inode/directory"
+
     fun getMimeType(localPath: Path): String =
-        Files.probeContentType(localPath) ?: tika.detect(localPath)
+        mimeTypeDirectory.takeIf { localPath.isDirectory() } ?: Files.probeContentType(localPath) ?: tika.detect(localPath)
 
     fun createPeriod(years: Int, months: Int, days: Int, weeks: Int): Period =
         Period.of(years, months, days + Math.multiplyExact(weeks, 7))
@@ -85,10 +95,10 @@ object CommonUtil {
         null
     }
 
-    private fun parseDate(yearString: String, monthString: String, dayString: String): LocalDate? {
+    fun parseDate(yearString: String, monthString: String?, dayString: String?): LocalDate? {
         val year = parseInt(yearString) ?: return null
-        val month = (parseInt(monthString) ?: return null).coerceAtLeast(1).coerceAtMost(12)
-        val day = (parseInt(dayString) ?: return null).coerceAtLeast(1).coerceAtMost(31)
+        val month = if (monthString == null) 1 else (parseInt(monthString) ?: return null).coerceAtLeast(1).coerceAtMost(12)
+        val day = if (dayString == null) 1 else (parseInt(dayString) ?: return null).coerceAtLeast(1).coerceAtMost(31)
         return try {
             LocalDate.of(year, month, day)
         } catch (_: DateTimeException) {
@@ -96,11 +106,19 @@ object CommonUtil {
         }
     }
 
-    private val dateRegex = Regex("^([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2}))?)?(?:$|[^0-9])")
+    val dateRegex = Regex("""^([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2}))?)?(?:$|[A-Z+. ])""")
+
+    fun parseDatePairs(string: String): Pair<String, Pair<String, String?>?>? {
+        val groups = dateRegex.find(string)?.groups ?: return null
+        val year = groups[1]?.value ?: return null
+        val month = groups[2]?.value
+        val day = groups[3]?.value
+        return year to (if (month != null) month to day else null)
+    }
 
     fun parseDate(string: String): LocalDate? {
         val groups = dateRegex.find(string)?.groups ?: return null
-        return parseDate(groups[1]?.value ?: return null, groups[2]?.value ?: "0", groups[3]?.value ?: "0")
+        return parseDate(groups[1]?.value ?: return null, groups[2]?.value, groups[3]?.value)
     }
 
     fun createJsonHttpHeaders(): HttpHeaders =
@@ -124,47 +142,58 @@ object CommonUtil {
             }
         }
 
-    fun getSequenceOfChildren(ctx: RequestCtx, directory: InodeWithoutConfig): Sequence<Inode> =
+    fun getSequenceOfChildren(ctx: RequestCtx, container: HasChildren): Sequence<Inode1<*>> =
         sequence {
-            for (child in directory.children) {
+            for (child in container.children) {
                 yield(ctx.getInode(child))
             }
         }
 
-    fun getSequenceOfDescendants(ctx: PathFinder.Ctx, directory: InodeWithoutConfig, minDepth: Int, maxDepth: Int, pruneNames: Set<String>, onError: (String) -> Unit): Sequence<Inode> =
+    fun <T> getSequenceOfParts(parts: List<T>, firstIsEmpty: Boolean): Sequence<List<T>> =
         sequence {
-            for (child in directory.children) {
-                if (maxDepth >= 0 && child.name !in pruneNames) {
-                    val inode = ctx.createPathFinder(child).find()
-                    if (minDepth <= 0) {
-                        yield(inode)
-                    }
-                    try {
-                        if (inode.contentOperation.canDirectoryGet) {
-                            yieldAll(getSequenceOfDescendants(ctx, inode, minDepth - 1, maxDepth - 1, pruneNames, onError))
-                        }
-                    } catch (e: HttpException) {
-                        onError(e.message)
-                    }
-                }
+            val builder = ArrayList<T>(parts.size)
+            if (firstIsEmpty) {
+                yield(listOf())
+            }
+            for (part in parts) {
+                builder += part
+                yield(builder.toList())
             }
         }
 
-    fun <T> getPartsList(parts: List<T>, firstIsEmpty: Boolean): List<List<T>> {
-        val builder = LinkedList<T>()
-        val result = LinkedList<List<T>>()
-        if (firstIsEmpty) {
-            result.add(listOf())
+    fun <T> appendNullable(a: Set<T>, b: Iterable<T>?): Set<T> =
+        if (b != null) a + b else a
+
+    fun <T> appendNullable(a: Sequence<T>, b: Sequence<T>?): Sequence<T> =
+        if (b != null) a + b else a
+
+    fun <T> prependNullable(a: Sequence<T>?, b: Sequence<T>): Sequence<T> =
+        if (a != null) a + b else b
+
+    private fun getSafeIndex(index: Int, size: Int): Int? =
+        when (index) {
+            in -size..-1 -> index.mod(size)
+            in 0..<size -> index
+            else -> null
         }
-        for (part in parts) {
-            builder.add(part)
-            result.add(builder.toList())
+
+    fun <T> getSafe(list: List<T>, index: Int): T? =
+        getSafeIndex(index, list.size)?.let { list[it] }
+
+    fun replaceChecked(regex: Regex, input: CharSequence, replacement: String): String? =
+        regex.replaceFirst(input, replacement).takeIf { it !== input }
+
+    fun <T> concatenate(vararg lists: List<T>): MutableList<T> {
+        val size = lists.fold(0) { accumulator, list -> accumulator + list.size }
+        val result = ArrayList<T>(size)
+        for (list in lists) {
+            result += list
         }
         return result
     }
 
-    fun noop(@Suppress("UNUSED_PARAMETER") vararg any: Any) {}
+    fun noop(@Suppress("UNUSED_PARAMETER") vararg ignore: Any) = Unit
 
-    fun <T>nextOrNull(iterator: Iterator<T>): T? =
-        if (iterator.hasNext()) iterator.next() else null
+    fun stringToUri(string: String): String =
+        string.split("/").joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8.toString()).replace("+", "%20") }
 }

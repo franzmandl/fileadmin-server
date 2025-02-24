@@ -1,0 +1,6 @@
+{
+  "_type": "NewInodeVersion1",
+  "condition": {"_type": "SimplePathConditionVersion1", "minDepth": 1},
+  "isFile": true,
+  "name": "0000-00-00 - .txt"
+}

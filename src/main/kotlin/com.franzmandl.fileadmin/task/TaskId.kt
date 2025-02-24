@@ -5,7 +5,7 @@ import com.franzmandl.fileadmin.generated.task.TaskParser.*
 class TaskId(
     tree: StartContext,
 ) {
-    var id: Int? = null
+    var id: String? = null
 
     init {
         visitStart(tree)
@@ -30,9 +30,9 @@ class TaskId(
     private fun visitExprTrigger(ctx: ExprTriggerContext) {
         if (ctx.id().text == "id") {
             id = if (id == null) {
-                TaskUtil.visitIntArg(ctx.args())[0]
+                TaskUtil.visitStringArg(ctx.args())[0]
             } else {
-                throw TaskException("Semantic error: Multiple ids provided")
+                throw TaskException("Semantic error: Multiple ids provided.")
             }
         }
     }

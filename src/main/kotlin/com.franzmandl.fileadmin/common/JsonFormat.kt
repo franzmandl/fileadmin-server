@@ -1,6 +1,6 @@
 package com.franzmandl.fileadmin.common
 
-import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -9,6 +9,8 @@ object JsonFormat {
     val jsonFormat = Json {
         classDiscriminator = JsonFormat.classDiscriminator
         encodeDefaults = true
+        @OptIn(ExperimentalSerializationApi::class)
+        explicitNulls = false
     }
 
     inline fun <reified T> decodeFromString(string: String) = jsonFormat.decodeFromString<T>(string)

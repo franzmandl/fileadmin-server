@@ -1,7 +1,10 @@
 package com.franzmandl.fileadmin.filter
 
-import com.franzmandl.fileadmin.common.CommonUtil
+import com.franzmandl.fileadmin.common.ErrorHandler
 import com.franzmandl.fileadmin.common.HttpException
+import com.franzmandl.fileadmin.common.IteratorUtil
+import com.franzmandl.fileadmin.common.RegexUtil
+import com.franzmandl.fileadmin.dto.config.CommandId
 import com.franzmandl.fileadmin.resource.RequestCtx
 import com.franzmandl.fileadmin.vfs.*
 import org.apache.commons.lang3.StringUtils
@@ -10,67 +13,99 @@ import java.nio.file.attribute.FileTime
 import java.util.*
 
 class FilterFileSystem(
-    var time: FileTime?,
-    var ctx: FilterCtx,
+    time: FileTime?,
+    ctx: FilterCtx,
 ) : VirtualFileSystem {
-    override fun getInode(finder: PathFinder, remaining: List<String>): Inode {
-        val systemDirectoryName = finder.ctx.request.application.systemDirectoryName
+    var time: FileTime? = time
+        private set
+    var ctx: FilterCtx = ctx
+        private set
+
+    fun setLocked(time: FileTime, ctx: FilterCtx): FilterFileSystem {
+        synchronized(this) {
+            this.time = time
+            this.ctx = ctx
+        }
+        return this
+    }
+
+    override fun getInode(finder: PathFinder, remaining: List<String>): Inode1<*> {
         val filterStrings = LinkedList<String>()
         val systemStrings = LinkedList<String>()
-        splitRemaining(systemDirectoryName, remaining, filterStrings, systemStrings)
+        splitRemaining(finder.ctx.request.application.system.directoryName, remaining, filterStrings, systemStrings)
         val systemStringsIterator = systemStrings.iterator()
-        return when (CommonUtil.nextOrNull(systemStringsIterator)) {
+        return when (IteratorUtil.nextOrNull(systemStringsIterator)) {
             null -> {
-                val result = ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx.errors::add)
-                finder.filterHighlightTags = result.getHighlightTags()
-                if (result.children.isNotEmpty()) {
-                    result.children.add(finder.destination.resolve(systemDirectoryName))
+                if (finder.ctx.filterIsScanning) {
+                    finder.build(VirtualDirectory.createFromFinderAndChildren(finder, TagTreeOperation(this, false), setOf()), null)
+                } else {
+                    val result = ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx)
+                    finder.build(
+                        VirtualDirectory.createFromFinderAndChildSet(
+                            finder,
+                            TagTreeOperation(this, result.canRename),
+                            result.childSet
+                        ), result
+                    )
                 }
-                VirtualDirectory.createFromFinder(finder, TagTreeOperation(this, result.canRename), result.children)
             }
 
-            systemRoot -> when (CommonUtil.nextOrNull(systemStringsIterator)) {
+            systemRoot -> when (IteratorUtil.nextOrNull(systemStringsIterator)) {
                 null -> {
-                    ctx.scanItems(finder.ctx.request, false, finder.ctx.errors::add)
-                    VirtualDirectory.createFromFinderAndNames(
-                        finder, VirtualDirectory.TreeOperation.Default, listOf(
-                            systemAllTagsTxt,
-                            systemCommonTagsTxt,
-                            systemUnknownTagsJson,
-                            systemUnknownTagsTxt,
-                            systemUnusedTagsTxt,
-                        )
+                    ctx.scanItems(finder.ctx.request, CommandId.GetSystemRoot, finder.ctx)
+                    finder.build(
+                        VirtualDirectory.createFromFinderAndNames(
+                            finder, VirtualDirectory.TreeOperation.Default, listOf(
+                                systemAllTagsTxt,
+                                systemCommonTagsTxt,
+                                systemUnknownTagsJson,
+                                systemUnknownTagsTxt,
+                                systemUnusedTagsTxt,
+                            )
+                        ), null
                     )
                 }
 
                 systemAllTagsTxt ->
-                    VirtualFile.createFromFinder(
-                        finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getAllTags(finder.ctx))
+                    finder.build(
+                        VirtualFile.createFromFinder(
+                            finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
+                            collectPlainTagNames(getAllTags(finder.ctx))
+                        ), null
                     )
 
-                systemCommonTagsTxt ->
-                    VirtualFile.createFromFinder(
-                        finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx.errors::add).commonTags)
+                systemCommonTagsTxt -> {
+                    val result = ctx.filter(finder.ctx.request, finder.destination, filterStrings, finder.ctx)
+                    finder.build(
+                        VirtualFile.createFromFinder(
+                            finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
+                            collectPlainTagNames(ctx.filterNames(result.childSet.items, result.filters).commonTags)
+                        ), null
                     )
+                }
 
                 systemUnknownTagsJson ->
-                    VirtualFile.createFromFinder(
-                        finder, VirtualFile.TreeOperation.Default, MediaType.APPLICATION_JSON_VALUE,
-                        collectJsonTagNames(getUnknownTags(finder.ctx))
+                    finder.build(
+                        VirtualFile.createFromFinder(
+                            finder, VirtualFile.TreeOperation.Default, MediaType.APPLICATION_JSON_VALUE,
+                            collectJsonTagNames(getUnknownTags(finder.ctx))
+                        ), null
                     )
 
                 systemUnknownTagsTxt ->
-                    VirtualFile.createFromFinder(
-                        finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getUnknownTags(finder.ctx))
+                    finder.build(
+                        VirtualFile.createFromFinder(
+                            finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
+                            collectPlainTagNames(getUnknownTags(finder.ctx))
+                        ), null
                     )
 
                 systemUnusedTagsTxt ->
-                    VirtualFile.createFromFinder(
-                        finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
-                        collectPlainTagNames(getUnusedTags(finder.ctx))
+                    finder.build(
+                        VirtualFile.createFromFinder(
+                            finder, VirtualFile.TreeOperation.Default, MediaType.TEXT_PLAIN_VALUE,
+                            collectPlainTagNames(getUnusedTags(finder.ctx))
+                        ), null
                     )
 
                 else -> throw HttpException.badRequest("Illegal path: ${finder.destination}")
@@ -85,20 +120,20 @@ class FilterFileSystem(
         while (iterator.hasNext()) {
             val current = iterator.next()
             if (current == systemDirectoryName) {
-                systemStrings.add(systemRoot)
+                systemStrings += systemRoot
                 break
             }
-            filterStrings.add(current)
+            filterStrings += current
         }
         while (iterator.hasNext()) {
-            systemStrings.add(iterator.next())
+            systemStrings += iterator.next()
         }
     }
 
     private fun collectJsonTagNames(tags: Iterable<Tag>): ByteArray {
         val builder = StringBuilder().appendLine("  [")
         for (tag in tags.sortedBy(::sortSelector)) {
-            builder.append("    {\"_type\": \"TagVersion1\", \"name\": \"#").append(tag.name).appendLine("\"},")
+            builder.append("""    {"_type": "TagVersion1", "name": "#""").append(tag.name).append('"').appendLine("},")
         }
         return builder.appendLine("    null" /* Makes JSON valid. */).appendLine("  ]").toString().toByteArray()
     }
@@ -112,17 +147,17 @@ class FilterFileSystem(
     }
 
     private fun getAllTags(pathFinderCtx: PathFinder.Ctx): Iterable<Tag> {
-        ctx.scanItems(pathFinderCtx.request, true, pathFinderCtx.errors::add)
+        ctx.scanItems(pathFinderCtx.request, CommandId.GetAllTags, pathFinderCtx)
         return ctx.registry.tags.values
     }
 
-    private fun getUnknownTags(pathFinderCtx: PathFinder.Ctx): Set<Tag> {
-        ctx.scanItems(pathFinderCtx.request, true, pathFinderCtx.errors::add)
-        return ctx.registry.tagUnknown.children
+    private fun getUnknownTags(pathFinderCtx: PathFinder.Ctx): Iterable<Tag> {
+        ctx.scanItems(pathFinderCtx.request, CommandId.GetUnknownTags, pathFinderCtx)
+        return ctx.registry.systemTags.unknown.getSequenceOfChildren(Tag.ChildrenParameter.all).asIterable()
     }
 
     private fun getUnusedTags(pathFinderCtx: PathFinder.Ctx): Set<Tag> {
-        val items = ctx.getSequenceOfItems(pathFinderCtx.request, true, pathFinderCtx.errors::add).toList()  // Materialize before calculating unusedTags.
+        val items = ctx.getLockedItemsList(pathFinderCtx.request, CommandId.GetUnusedTags, pathFinderCtx).toList() // Materialize before calculating unusedTags.
         val unusedTags = ctx.registry.tags.values.toMutableSet()
         for (item in items) {
             unusedTags.removeAll(item.allTags.all)
@@ -130,13 +165,14 @@ class FilterFileSystem(
         return unusedTags
     }
 
-    fun requiresAction(requestCtx: RequestCtx, onError: (String) -> Unit): Boolean {
-        for (item in ctx.getSequenceOfItems(requestCtx, true, onError)) {
-            if (ctx.registry.tagLostAndFound in item.allTags.all) {
-                return true
-            }
+    fun requiresAction(requestCtx: RequestCtx, errorHandler: ErrorHandler): Boolean {
+        if (ctx.getLockedItemsList(requestCtx, CommandId.RequiresAction, errorHandler).find { ctx.registry.systemTags.lostAndFound in it.allTags.all } != null) {
+            return true
         }
-        return ctx.registry.tagUnknown.children.isNotEmpty()
+        for (child in ctx.registry.systemTags.unknown.getSequenceOfChildren(Tag.ChildrenParameter.all)) {
+            return true
+        }
+        return false
     }
 
     @Suppress("MemberVisibilityCanBePrivate")
@@ -144,20 +180,29 @@ class FilterFileSystem(
         const val aliasDeliminator = '='
         const val childPrefix = '\''
         const val childPrefixString = childPrefix.toString()
-        const val descendantsPrefix = '@'
-        const val descendantsPrefixString = descendantsPrefix.toString()
         const val operatorPrefix = ','
+        const val operatorEnd = ')'
+        const val operatorEndString = operatorEnd.toString()
         const val priorityPrefix = '!'
         const val priorityPrefixString = priorityPrefix.toString()
         const val tagPrefix = '#'
         const val tagPrefixString = tagPrefix.toString()
 
+        val compareOperators = CompareOperator.entries.associateBy { it.text }
         const val operator = "operator"
         const val operatorElse = "else"
         const val operatorEvaluate = "evaluate"
+        const val operatorIntersect = "intersect"
+        const val operatorMax = "max("
+        val operatorMaxSuggestions = setOf("100", "250", "500")
         const val operatorNot = "not"
-        val operatorReasons = TagFilter.Reason.values().associateBy { "reason${it.name}" }
-        val operatorRelationships = TagFilter.Relationship.values().associateBy { "relationship${it.name}" }
+        const val operatorTagReason = "tagReason"
+        val operatorTagReasons = TagFilter.Reason.entries.associateBy { it.name }
+        const val operatorTagRelationship = "tagRelationship"
+        val operatorTagRelationships = TagFilter.Relationship.entries.associateBy { it.name }
+        const val operatorText = "text"
+        val operatorTextReasons = TextFilter.Reason.entries.associateBy { it.name + "(" }
+        const val operatorTime = "time"
 
         const val systemRoot = ""
         const val systemAllTagsTxt = "allTags.txt"
@@ -166,11 +211,17 @@ class FilterFileSystem(
         const val systemUnknownTagsTxt = "unknownTags.txt"
         const val systemUnusedTagsTxt = "unusedTags.txt"
 
-        val tagNameRegex = Regex("(?:\\p{L}+|\\d+[\\p{L}_])[\\p{L}\\d_]*")
-        val tagRegex = Regex("${Regex.escape(tagPrefixString)}(${Regex.escape(descendantsPrefixString)})?($tagNameRegex)")
+        val operatorsWithoutElse =
+            listOf(operatorEvaluate, operatorIntersect, operatorMax, operatorNot, operatorTagReason, operatorTagRelationship, operatorText, operatorTime)
+        val operatorsWithElse = operatorsWithoutElse + listOf(operatorElse)
+        val operators = listOf(operator, operatorEvaluate, operatorIntersect)
+        val operatorsWithPrefix = operators.map { operatorPrefix + it }
 
-        /** Fragment is not optional. A general URL pattern would be "${urlWithFragmentRegex}?". */
-        val urlWithFragmentRegex = Regex("[^:/?#\"()\\s]+://[^/?#\"()\\s]+[^?#\"\\s]*(?:\\?[^#\"\\s]*)?(?:#[^\"\\s]*)")
+        val tagNameEndingLetterRegex = Regex("""[\p{L}\d_]""")
+        val tagNameRegex = Regex("""(?:\p{L}+|\d+[\p{L}_])$tagNameEndingLetterRegex*""")
+        val tagRegex = Regex("${Regex.escape(tagPrefixString)}($tagNameRegex)")
+
+        val urlWithFragmentRegex = Regex("""[^:/?#"()\s]+://[^/?#"()\s]+[^?#"\s]*(?:\?[^#"\s]*)?#[^"\s]*""")
         const val urlWithFragmentReplacement = 'u'
         const val urlWithFragmentReplacementString = urlWithFragmentReplacement.toString()
 
@@ -186,10 +237,44 @@ class FilterFileSystem(
         fun isValidName(name: String): Boolean =
             tagNameRegex.matches(name)
 
-        fun validateName(name: String): String =
-            if (isValidName(name)) name else throw HttpException.badRequest("Illegal name: '$name' matches anti pattern.")
+        fun trimPrefix(name: String, errorHandler: ErrorHandler): String =
+            if (!name.startsWith(tagPrefixString)) {
+                errorHandler.onError("""Illegal tag name: "$name" does not start with $tagPrefixString.""")
+                name
+            } else {
+                name.substring(1)
+            }
 
         private fun sortSelector(tag: Tag) =
             tag.sortableName
+
+        private val patterns = listOf<Pair<Regex, (MatchResult) -> CharSequence>>(
+            Regex("""&""") to { "and" },
+            Regex("""[$]""") to { "s" },
+            Regex("""[,.] """) to { " " },
+            Regex("""([^\p{L}\d_]+)(\p{L}?)""") to { if (it.groupValues[1].length > 1) "_${it.groupValues[2]}" else it.groupValues[2].uppercase() },
+        )
+
+        fun toTagName(part: String): String {
+            var result = part
+            for ((pattern, transform) in patterns) {
+                result = result.replace(pattern, transform)
+            }
+            return result
+        }
+
+        fun replaceUrlsWithFragment(content: CharSequence): String =
+            content.replace(urlWithFragmentRegex) { urlWithFragmentReplacementString.repeat(it.value.length) }
+
+        fun getSequenceOfConsecutiveTagNames(value: String, startIndex: Int): Sequence<List<StringRange<Nothing?>>> =
+            if (startIndex > value.length) {
+                // Happens when the parent path of an input directory with minDepth = 0 (=yielding itself) is visited.
+                sequenceOf()
+            } else {
+                RegexUtil.getSequenceOfGroupedConsecutiveMatchResults(tagRegex.findAll(value.substring(startIndex))) {
+                    val nameGroup = it.groups[1]!!
+                    StringRange(nameGroup.value, startIndex + nameGroup.range.first, startIndex + nameGroup.range.last, null)
+                }
+            }
     }
 }

@@ -31,11 +31,11 @@ object PathUtil {
         override fun replaceFrom(string: String): String = string.replace('/', char)
     }
 
-    private val nameRegex = Regex("^[^${separator.pattern}]+$")
+    private val nameRegex = Regex("""^[^${separator.pattern}]+$""")
 
     fun validateName(name: String): String {
         if (!nameRegex.matches(name) || name == "." || name == "..") {
-            throw HttpException.badRequest("Illegal name: '$name' matches anti pattern.")
+            throw HttpException.badRequest("""Illegal name: "$name" matches anti pattern.""")
         }
         return name
     }

@@ -10,8 +10,8 @@ import java.nio.file.Path
 
 /**
  * Can be absolute or relative, outside or inside the jail.
- * Is separated by separatorChar, but might also contain '/' or '\'.
- * Might contain '.' or '..'.
+ * Is separated by separatorChar, but might also contain "/" or "\".
+ * Might contain "." or "..".
  * Example: paths from config files, symlink targets
  */
 @Serializable(with = UnsafePath.Serializer::class)

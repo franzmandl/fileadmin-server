@@ -19,27 +19,32 @@ interface ItemTags {
         override val tags: Set<Tag> = mutableTags
         override val twins: Set<Tag> = mutableTwins
 
-        fun addTag(tag: Tag, addDescendants: Boolean): Mutable =
-            add(tag.addAncestorsTo(mutableSetOf()), if (addDescendants) tag.addDescendantsTo(mutableSetOf()) else setOf(), tag, tag.addTwinsTo(mutableSetOf()))
+        fun addTag(tag: Tag): Mutable =
+            add(
+                tag.getSequenceOfAncestors(),
+                if (tag.parameter.implyDescendants) tag.getSequenceOfDescendants(Tag.ChildrenParameter.notComputed) else sequenceOf(),
+                tag,
+                tag.getSequenceOfTwins()
+            )
 
         fun addAll(other: ItemTags): Mutable {
-            mutableAll.addAll(other.all)
-            mutableAncestors.addAll(other.ancestors)
-            mutableDescendants.addAll(other.descendants)
-            mutableTags.addAll(other.tags)
-            mutableTwins.addAll(other.twins)
+            mutableAll += other.all
+            mutableAncestors += other.ancestors
+            mutableDescendants += other.descendants
+            mutableTags += other.tags
+            mutableTwins += other.twins
             return this
         }
 
-        private fun add(ancestors: Set<Tag>, descendants: Set<Tag>, tag: Tag, twins: Set<Tag>): Mutable {
-            mutableAll.addAll(ancestors)
-            mutableAll.addAll(descendants)
-            mutableAll.add(tag)
-            mutableAll.addAll(twins)
-            mutableAncestors.addAll(ancestors)
-            mutableDescendants.addAll(descendants)
-            mutableTags.add(tag)
-            mutableTwins.addAll(twins)
+        private fun add(ancestors: Sequence<Tag>, descendants: Sequence<Tag>, tag: Tag, twins: Sequence<Tag>): Mutable {
+            mutableAll += ancestors
+            mutableAll += descendants
+            mutableAll += tag
+            mutableAll += twins
+            mutableAncestors += ancestors
+            mutableDescendants += descendants
+            mutableTags += tag
+            mutableTwins += twins
             return this
         }
 

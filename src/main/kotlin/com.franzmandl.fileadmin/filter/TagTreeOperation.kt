@@ -1,12 +1,10 @@
 package com.franzmandl.fileadmin.filter
 
+import com.franzmandl.fileadmin.common.ErrorHandler
 import com.franzmandl.fileadmin.common.HttpException
-import com.franzmandl.fileadmin.model.config.ConditionVersion1
+import com.franzmandl.fileadmin.dto.config.CommandId
 import com.franzmandl.fileadmin.resource.RequestCtx
-import com.franzmandl.fileadmin.vfs.Inode
-import com.franzmandl.fileadmin.vfs.SafePath
-import com.franzmandl.fileadmin.vfs.VirtualDirectory
-import org.slf4j.Logger
+import com.franzmandl.fileadmin.vfs.*
 import org.slf4j.LoggerFactory
 import java.util.*
 
@@ -14,16 +12,16 @@ class TagTreeOperation(
     private val system: FilterFileSystem,
     override val canInodeRename: Boolean,
 ) : VirtualDirectory.TreeOperation {
-    override fun move(ctx: RequestCtx, inode: Inode, target: Inode) {
+    override fun move(ctx: RequestCtx, inode: Inode0, target: Inode1<*>) {
         if (!canInodeRename) {
-            throw HttpException.notSupported().move(inode.path).to(target.path).build()
+            throw HttpException.notSupported().move(inode.path).to(target.inode0.path).build()
         }
-        if (inode.path.parent != target.path.parent) {
+        if (inode.path.parent != target.inode0.path.parent) {
             throw HttpException.badRequest("A tag can only be renamed.")
         }
         val oldName = FilterFileSystem.trimName(inode.path.name)
-        val newName = FilterFileSystem.trimName(target.path.name)
-        if (!FilterFileSystem.tagNameRegex.matches(newName)) {
+        val newName = FilterFileSystem.trimName(target.inode0.path.name)
+        if (!FilterFileSystem.isValidName(newName)) {
             throw HttpException.badRequest("The new name is no valid name for a tag.")
         }
         val replaceCtx = ReplaceCtx(system, ctx, oldName, newName)
@@ -51,8 +49,10 @@ class TagTreeOperation(
     ) {
         private val commands = LinkedList<Command>()
         private var iterationCount = 0
-        private val logger: Logger = LoggerFactory.getLogger(ReplaceCtx::class.java)
-        private val oldHash = "${FilterFileSystem.tagPrefix}$oldName"
+        private val logger = LoggerFactory.getLogger(this::class.java)
+
+        // Also see https://www.regular-expressions.info/lookaround.html
+        private val oldHashRegex = Regex("${Regex.escape("${FilterFileSystem.tagPrefix}$oldName")}(?!${FilterFileSystem.tagNameEndingLetterRegex})")
         private val newHash = "${FilterFileSystem.tagPrefix}$newName"
 
         fun addCommand(command: Command) {
@@ -68,26 +68,39 @@ class TagTreeOperation(
         }
 
         fun condition(): Boolean =
-            iterationCount++ < request.application.maxIterationCount
+            iterationCount++ < request.application.system.maxIterationCount
 
         fun getTag(): Tag? {
             val inode = request.getInode(system.ctx.output)  // Trigger a database reload if necessary.
-            val filterCtx = (inode.config.filter ?: throw HttpException.badRequest("Filter directory lost.")).ctx
-            if (filterCtx != system.ctx) {
-                throw HttpException.badRequest("Illegal state: Contexts are not the same.")
-            }
-            return filterCtx.registry.getTag(oldName)
+            return (inode.config.filter ?: throw HttpException.badRequest("Filter directory lost.")).ctx.also {
+                if (it != system.ctx) {
+                    throw HttpException.badRequest("Illegal state: Contexts are not the same.")
+                }
+            }.registry.getTag(oldName)
         }
 
         fun getNextItem(reason: TagFilter.Reason): Item? {
-            val items = system.ctx.filterItems(request, listOf(TagFilter(getTag() ?: return null, reason, TagFilter.Relationship.Self))) {
-                throw HttpException.badRequest(it)
-            }
-            return items.firstOrNull()
+            val items = system.ctx.getLockedItemsList(request, CommandId.MoveTag, ErrorHandler.badRequest).toMutableList()
+            return system.ctx.filterItems(request, items, listOf(TagFilter(getTag() ?: return null, reason, TagFilter.Relationship.Self)), ErrorHandler.badRequest).firstOrNull()
         }
 
-        fun replaceString(string: String): String =
-            string.replace(oldHash, newHash)
+        fun replaceString(string: String): String {
+            // Having a lookaround in oldHashRegex to detect urlWithFragment performs much worse.
+            var mutableUrl = FilterFileSystem.urlWithFragmentRegex.find(string)
+            return string.replace(oldHashRegex, fun(old: MatchResult): String {
+                while (true) {
+                    val url = mutableUrl
+                    when {
+                        url == null -> return newHash
+                        old.range.last < url.range.first -> return newHash
+                        url.range.first <= old.range.first && old.range.last <= url.range.last -> return old.value
+                        else -> mutableUrl = url.next()
+                    }
+                }
+                @Suppress("UNREACHABLE_CODE")
+                error("Unreachable Code.")
+            })
+        }
 
         fun revert(e: Exception): String {
             val builder = StringBuilder().appendLine("An error occurred during renaming. This message is also logged.")
@@ -117,13 +130,13 @@ class TagTreeOperation(
 
     private class ContentVisitor(
         private val ctx: ReplaceCtx,
-        override val condition: ConditionVersion1,
+        override val condition: PathCondition,
         override val pruneNames: Set<String>,
     ) : ItemContent.Visitor {
-        override val onError: (String) -> Unit = { throw HttpException.badRequest(it) }
+        override val errorHandler = ErrorHandler.badRequest
 
-        override fun onDirectory(inode: Inode): Boolean {
-            for (child in inode.children) {
+        override fun onDirectory(inode: Inode1<*>): Boolean {
+            for (child in inode.inode0.children) {
                 if (!move(child, null)) {
                     return false
                 }
@@ -131,23 +144,23 @@ class TagTreeOperation(
             return true
         }
 
-        override fun onFile(inode: Inode): Boolean {
-            val oldText = inode.text
+        override fun onFile(inode: Inode1<*>): Boolean {
+            val oldText = inode.inode0.text
             val newText = ctx.replaceString(oldText)
-            ctx.addCommand(SetTextCommand(inode, oldText, newText))
+            ctx.addCommand(SetTextCommand(inode.inode0, oldText, newText))
             return oldText === newText
         }
 
-        override fun onName(inode: Inode): Boolean =
-            move(inode.path, inode)
+        override fun onName(inode: Inode1<*>): Boolean =
+            move(inode.inode0.path, inode)
 
-        private fun move(path: SafePath, inode: Inode?): Boolean {
+        private fun move(path: SafePath, inode: Inode1<*>?): Boolean {
             val newInodeName = ctx.replaceString(path.name)
             if (newInodeName === path.name) {
                 return true
             }
             val oldInode = inode ?: ctx.request.getInode(path)
-            val newPath = oldInode.path.resolveSibling(newInodeName)
+            val newPath = oldInode.inode0.path.resolveSibling(newInodeName)
             val newInode = ctx.request.getInode(newPath)
             ctx.addCommand(MoveCommand(ctx.request, oldInode, newInode))
             return false
@@ -156,7 +169,7 @@ class TagTreeOperation(
 
     private fun replaceConfigFile(ctx: ReplaceCtx) {
         while (ctx.condition()) {
-            val configFiles = (ctx.getTag() ?: break).configFiles
+            val configFiles = (ctx.getTag() ?: break).getConfigFiles()
             if (configFiles.isEmpty()) {
                 break
             }
@@ -171,7 +184,7 @@ class TagTreeOperation(
     private fun replaceContent(ctx: ReplaceCtx) {
         while (ctx.condition()) {
             val item = ctx.getNextItem(TagFilter.Reason.Content) ?: break
-            ItemContent.visit(ctx.request.createPathFinderCtx(), item.inode, ContentVisitor(ctx, item.input.contentCondition, item.input.pruneNames))
+            ItemContent.visit(ctx.request.createPathFinderCtx(false), item.inode, ContentVisitor(ctx, item.input.contentCondition, item.input.contentCondition.pruneNames))
         }
     }
 
@@ -179,7 +192,7 @@ class TagTreeOperation(
         while (ctx.condition()) {
             val item = ctx.getNextItem(TagFilter.Reason.Name) ?: break
             val oldInode = item.inode
-            val newPath = oldInode.path.resolveSibling(ctx.replaceString(oldInode.path.name))
+            val newPath = oldInode.inode0.path.resolveSibling(ctx.replaceString(oldInode.inode0.path.name))
             val newInode = ctx.request.getInode(newPath)
             ctx.addCommand(MoveCommand(ctx.request, oldInode, newInode))
         }
@@ -188,18 +201,18 @@ class TagTreeOperation(
     private fun replaceParentPath(ctx: ReplaceCtx) {
         while (ctx.condition()) {
             val item = ctx.getNextItem(TagFilter.Reason.ParentPath) ?: break
-            var oldPath: SafePath? = item.inode.path
+            var oldPath: SafePath? = item.inode.inode0.path
             while (oldPath != null) {
                 oldPath = oldPath.parent ?: break
                 if (oldPath.absoluteString.length <= item.parentPathStartIndex) {
-                    throw HttpException.badRequest("Illegal state: '$oldPath' should never have been found by getNextItem (${oldPath.absoluteString.length} <= ${item.parentPathStartIndex}).")
+                    throw HttpException.badRequest("""Illegal state: "$oldPath" should never have been found by getNextItem (${oldPath.absoluteString.length} <= ${item.parentPathStartIndex}).""")
                 }
                 val newInodeName = ctx.replaceString(oldPath.name)
                 if (newInodeName == oldPath.name) {
                     continue
                 }
                 val oldInode = ctx.request.getInode(oldPath)
-                val newPath = oldInode.path.resolveSibling(newInodeName)
+                val newPath = oldInode.inode0.path.resolveSibling(newInodeName)
                 val newInode = ctx.request.getInode(newPath)
                 ctx.addCommand(MoveCommand(ctx.request, oldInode, newInode))
                 break
@@ -218,32 +231,32 @@ class TagTreeOperation(
 
     private class MoveCommand(
         private val ctx: RequestCtx,
-        private val oldInode: Inode,
-        private val newInode: Inode,
+        private val oldInode: Inode1<*>,
+        private val newInode: Inode1<*>,
     ) : Command {
         override fun apply() {
-            oldInode.move(ctx, newInode)
+            oldInode.inode0.move(ctx, newInode)
         }
 
         override val applyStringLong: String
-            get() = "Move '${oldInode.path.absoluteString}' -> '${newInode.path.absoluteString}'"
+            get() = """Move "${oldInode.inode0.path.absoluteString}" -> "${newInode.inode0.path.absoluteString}"."""
 
         override val applyStringShort: String
             get() = applyStringLong
 
         override fun revert() {
-            newInode.move(ctx, oldInode)
+            newInode.inode0.move(ctx, oldInode)
         }
 
         override val revertStringLong: String
-            get() = "Move '${newInode.path.absoluteString}' -> '${oldInode.path.absoluteString}'"
+            get() = """Move "${newInode.inode0.path.absoluteString}" -> "${oldInode.inode0.path.absoluteString}"."""
 
         override val revertStringShort: String
             get() = revertStringLong
     }
 
     private class SetTextCommand(
-        private val inode: Inode,
+        private val inode: Inode0,
         private val oldText: String,
         private val newText: String,
     ) : Command {
@@ -252,7 +265,7 @@ class TagTreeOperation(
         }
 
         override val applyStringLong: String
-            get() = "$applyStringShort '$oldText' -> '$newText'"
+            get() = """$applyStringShort "$oldText" -> "$newText"."""
 
         override val applyStringShort: String
             get() = "SetText ${inode.path.absoluteString}"
@@ -262,7 +275,7 @@ class TagTreeOperation(
         }
 
         override val revertStringLong: String
-            get() = "$revertStringShort '$newText' -> '$oldText'"
+            get() = """$revertStringShort "$newText" -> "$oldText"."""
 
         override val revertStringShort: String
             get() = "SetText ${inode.path.absoluteString}"

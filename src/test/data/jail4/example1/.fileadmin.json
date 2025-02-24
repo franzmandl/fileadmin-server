@@ -1,0 +1,78 @@
+{
+  "_type": "FilterVersion1",
+  "imports": ["input1/pruneName/file.json"],
+  "input": [
+    {"_type": "InputVersion1", "path": "input0", "enabled": false, "comment": "Disabled."},
+    {"_type": "InputVersion1", "path": "input1",
+      "condition": {"_type": "SimplePathConditionVersion1", "time": true},
+      "contentCondition": {"_type": "SimplePathConditionVersion1", "fileNameGlob": "*", "maxDepth": 1},
+      "pruneNames": [".ignoreDirectory", ".ignoreFile", "pruneName"]
+    },
+    {"_type": "InputVersion1", "path": "input2"},
+    {"_type": "InputVersion1", "path": "input3"},
+  null],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  },
+  "operations": [
+    {"_type": "OperationVersion1", "operands": [
+      {"_type": "SelfOperandVersion1", "name": "#Email", "parent": true},
+      {"_type": "LeafOperandVersion1", "name": "#preposition", "parent": true},
+      {"_type": "TextOperandVersion1", "text": "_"},
+      {"_type": "LeafOperandVersion1", "name": "#person", "parent": true},
+    null]},
+  null],
+  "relationships": [
+    {"_type": "RelationshipDefinitionVersion1", "name": "group", "template": {"_type": "TagVersion1", "name": "#group_<>", "parents": ["#person"]}},
+  null],
+  "tags": [
+    {"_type": "TagVersion1", "name": "#device", "children": [
+      {"_type": "TagVersion1", "name": "#desktop1"},
+      {"_type": "TagVersion1", "name": "#phone1", "comment": "some comment"},
+      {"_type": "TagVersion1", "name": "#printer1"},
+      {"_type": "TagVersion1", "name": "#printer1a"},
+    null]},
+    {"_type": "TagVersion1", "name": "#company", "children": [
+      {"_type": "TagVersion1", "name": "#CompanyA", "relationships": {"group": [
+        {"_type": "TagVersion1", "name": "#EmployeeA1"},
+        {"_type": "TagVersion1", "name": "#EmployeeA2"},
+      null]}},
+    null]},
+    {"_type": "TagVersion1", "name": "#hardware"},
+    {"_type": "TagVersion1", "name": "#legacy", "parents": ["#prune"]},
+    {"_type": "TagVersion1", "name": "#person", "children": [
+      {"_type": "TagVersion1", "name": "#AntonioElliott"},
+      {"_type": "TagVersion1", "name": "#KeaganValencia"},
+      {"_type": "TagVersion1", "name": "#LandenKirk"},
+      {"_type": "TagVersion1", "name": "#FranzMandl#me"},
+      {"_type": "TagVersion1", "name": "#MinaHendricks"},
+      {"_type": "TagVersion1", "name": "#parents", "implyDescendants": true, "spread": true, "children": [
+        {"_type": "TagVersion1", "name": "#Dad"},
+        {"_type": "TagVersion1", "name": "#Mom"},
+      null]},
+    null]},
+    {"_type": "TagVersion1", "name": "#preposition", "children": [
+      {"_type": "TagVersion1", "name": "#From"},
+      {"_type": "TagVersion1", "name": "#To"},
+    null]},
+    {"_type": "TagVersion1", "name": "#programming", "children": [
+      {"_type": "TagVersion1", "name": "#js#javascript"},
+    null]},
+    {"_type": "TagVersion1", "name": "#software", "children": [
+      {"_type": "TagVersion1", "name": "#code", "children": [
+        {"_type": "TagVersion1", "name": "#js#javascript"},
+      null]},
+    null]},
+    {"_type": "TagVersion1", "name": "#TaskStatus", "children": [
+      {"_type": "TagVersion1", "name": "#AbortedTask"},
+      {"_type": "TagVersion1", "name": "#BacklogTask"},
+      {"_type": "TagVersion1", "name": "#DoneTask"},
+      {"_type": "TagVersion1", "name": "#To_DoTask"},
+    null]},
+    {"_type": "TagVersion1", "name": "#unused1", "children": [
+      {"_type": "TagVersion1", "name": "#unused2"},
+    null]},
+    {"_type": "TagVersion1", "name": "#unused3", "suggestMinimumLength": 4},
+  null]
+}

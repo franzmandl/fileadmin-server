@@ -1,11 +1,13 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ServerKt development,jail3" type="JetRunConfigurationType">
     <envs>
+      <env name="spring_config_additional_location" value="file:./src/test/resources/" />
       <env name="spring_profiles_active" value="development,jail3" />
     </envs>
     <option name="MAIN_CLASS_NAME" value="com.franzmandl.fileadmin.ServerKt" />
     <module name="fileadmin-server.main" />
     <shortenClasspath name="NONE" />
+    <option name="VM_PARAMETERS" value="-Djava.awt.headless=true" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

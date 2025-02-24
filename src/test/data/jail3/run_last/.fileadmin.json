@@ -1,0 +1,4 @@
+{
+  "_type": "RunLastVersion1",
+  "condition": {"_type": "SimplePathConditionVersion1", "nameGlob": "*.txt", "minDepth": 1}
+}

@@ -1,0 +1,27 @@
+{
+  "_type": "FilterVersion1",
+  "input": [
+    {"_type": "InputVersion1", "path": "input1"}
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  },
+  "tags": [
+    {"_type": "TagVersion1", "name": "#A", "children": [
+      {"_type": "TagVersion1", "name": "#AA"},
+      {"_type": "TagVersion1", "name": "#AB"},
+      {"_type": "TagVersion1", "name": "#AC"},
+    null]},
+    {"_type": "TagVersion1", "name": "#B", "children": [
+      {"_type": "TagVersion1", "name": "#BA"},
+      {"_type": "TagVersion1", "name": "#BB"},
+      {"_type": "TagVersion1", "name": "#BC"},
+    null]},
+    {"_type": "TagVersion1", "name": "#C", "children": [
+      {"_type": "TagVersion1", "name": "#CA"},
+      {"_type": "TagVersion1", "name": "#CB"},
+      {"_type": "TagVersion1", "name": "#CC"},
+    null]},
+  null]
+}

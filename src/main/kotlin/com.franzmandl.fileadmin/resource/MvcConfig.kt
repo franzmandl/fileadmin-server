@@ -1,6 +1,6 @@
 package com.franzmandl.fileadmin.resource
 
-import com.franzmandl.fileadmin.model.ApplicationCtx
+import com.franzmandl.fileadmin.dto.ApplicationCtx
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.EnableWebMvc
@@ -10,18 +10,18 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 @EnableWebMvc
 class MvcConfig(
-    @Autowired private val config: ApplicationCtx
+    @Autowired private val applicationCtx: ApplicationCtx,
 ) : WebMvcConfigurer {
     override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
-        if (config.paths.bookmarks != null) {
+        if (applicationCtx.bookmarks.path != null) {
             registry
                 .addResourceHandler("${ApplicationCtx.RequestMappingPaths.bookmarks}/**")
-                .addResourceLocations("file:${config.paths.bookmarks}/")
+                .addResourceLocations("file:${applicationCtx.bookmarks.path}/")
         }
-        if (config.paths.web != null) {
+        if (applicationCtx.web.path != null) {
             registry
                 .addResourceHandler("${ApplicationCtx.RequestMappingPaths.web}/**")
-                .addResourceLocations("file:${config.paths.web}/")
+                .addResourceLocations("file:${applicationCtx.web.path}/")
         }
     }
 }

@@ -37,7 +37,7 @@ rsync -aiv --delete ./build/install/fileadmin-server/ /opt/fileadmin/server
 
 Create a file `/opt/fileadmin/config/application-production.properties` and configure it to your desires.
 See `./src/main/resources/application.properties` for available properties.
-At least specify `application.paths.jail`.
+At least specify `application.jail.path`.
 
 ```shell
 cd /opt/fileadmin

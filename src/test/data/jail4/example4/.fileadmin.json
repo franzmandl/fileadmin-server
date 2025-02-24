@@ -1,0 +1,12 @@
+{
+  "_type": "FilterVersion1",
+  "input": [
+    {"_type": "InputVersion1", "path": "inputDirectory1", "condition": {"_type": "SimplePathConditionVersion1", "minDepth": 0}},
+    {"_type": "InputVersion1", "path": "inputFile1", "condition": {"_type": "SimplePathConditionVersion1", "minDepth": 0}},
+    {"_type": "InputVersion1", "path": "inputFile2"}
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  }
+}

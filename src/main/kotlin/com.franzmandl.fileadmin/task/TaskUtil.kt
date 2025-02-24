@@ -5,7 +5,7 @@ import com.franzmandl.fileadmin.generated.task.TaskLexer
 import com.franzmandl.fileadmin.generated.task.TaskParser
 import com.franzmandl.fileadmin.generated.task.TaskParser.*
 import com.franzmandl.fileadmin.resource.RequestCtx
-import com.franzmandl.fileadmin.vfs.Inode
+import com.franzmandl.fileadmin.vfs.Inode1
 import com.franzmandl.fileadmin.vfs.UnsafePath
 import org.antlr.v4.runtime.*
 import java.time.LocalDate
@@ -14,7 +14,6 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 object TaskUtil {
-    const val doneStatus = "60-done"
     val maxDate: LocalDate = LocalDate.of(9999, 1, 1)
     val minDate: LocalDate = LocalDate.of(0, 1, 1)
 
@@ -39,45 +38,45 @@ object TaskUtil {
     private fun visitPeriodWeeks(ctx: PeriodWeeksContext): Period =
         Period.ofWeeks(parseInt(ctx.value.text ?: "0"))
 
-    fun visitIntArg(ctx: ArgsContext?) = ctx?.arg()?.mapIndexed { index, argCtx ->
+    fun visitStringArg(ctx: ArgsContext?) = ctx?.arg()?.mapIndexed { index, argCtx ->
         if (index == 0 && argCtx.string() != null) {
-            parseInt(argCtx.string().text)
+            argCtx.string().text
         } else {
-            throw TaskException("[${argCtx.text}] Semantic error: only one integer arg is accepted")
+            throw TaskException("[${argCtx.text}] Semantic error: only one integer arg is accepted.")
         }
-    } ?: throw TaskException("[${ctx?.text}] Semantic error: one integer arg is required")
+    } ?: throw TaskException("[${ctx?.text}] Semantic error: one integer arg is required.")
 
     fun parseInt(string: String): Int = try {
         string.toInt()
     } catch (e: NumberFormatException) {
-        throw TaskException("Parse error: Not a number '$string'")
+        throw TaskException("""Parse error: Not a number "$string".""")
     }
 
     fun parseDate(date: String, original: String): LocalDate =
-        CommonUtil.parseDate(date) ?: throw TaskException("[$original] Parse error: Not a date")
+        CommonUtil.parseDate(date) ?: throw TaskException("[$original] Parse error: Not a date.")
 
     fun parseArguments(args: List<Arg>, period: Period?): LinkedList<String> {
         val mutablePeriodArgs = LinkedList<String>()
         if (period != null) {
             if (period.years != 0) {
-                mutablePeriodArgs.add("${period.years}")
-                mutablePeriodArgs.add("years")
+                mutablePeriodArgs += "${period.years}"
+                mutablePeriodArgs += "years"
             }
             if (period.months != 0) {
-                mutablePeriodArgs.add("${period.months}")
-                mutablePeriodArgs.add("months")
+                mutablePeriodArgs += "${period.months}"
+                mutablePeriodArgs += "months"
             }
             if (period.days != 0 || mutablePeriodArgs.isEmpty()) {
-                mutablePeriodArgs.add("${period.days}")
-                mutablePeriodArgs.add("days")
+                mutablePeriodArgs += "${period.days}"
+                mutablePeriodArgs += "days"
             }
         }
         val mutableArgs = LinkedList<String>()
         args.forEach { arg ->
             when (arg) {
-                is StringArg -> mutableArgs.add(arg.value)
-                is KeywordArg -> mutableArgs.add(mutablePeriodArgs.joinToString(" "))
-                is KeywordArgs -> mutableArgs.addAll(mutablePeriodArgs)
+                is StringArg -> mutableArgs += arg.value
+                is KeywordArg -> mutableArgs += mutablePeriodArgs.joinToString(" ")
+                is KeywordArgs -> mutableArgs += mutablePeriodArgs
             }
         }
         return mutableArgs
@@ -87,52 +86,52 @@ object TaskUtil {
         val process = ProcessBuilder(args).start()
         if (!process.waitFor(10, TimeUnit.SECONDS)) {
             process.destroy()
-            throw TaskException("[$original] Binary error: Process timeout")
+            throw TaskException("[$original] Binary error: Process timeout.")
         }
         val exitValue = process.exitValue()
         val stderr = process.errorStream.bufferedReader().use { it.readText() }
         val (line, stdout) = process.inputStream.bufferedReader().use { it.readLine() to it.readText() }
         if (exitValue != 0 || stderr.isNotEmpty() || stdout.isNotEmpty()) {
-            throw TaskException("[$original] Binary error: $exitValue:$stdout:$stderr")
+            throw TaskException("""[$original] Binary error: exitValue=$exitValue stdout="$stdout" stderr="$stderr".""")
         }
         if (line == null) {
-            throw TaskException("[$original] Binary error: Line is null")
+            throw TaskException("[$original] Binary error: Line is null.")
         }
         return line
     }
 
-    fun visitExprTriggerBuiltin(requestCtx: RequestCtx, task: Inode, args: LinkedList<String>, original: String): LocalDate =
+    fun visitExprTriggerBuiltin(requestCtx: RequestCtx, task: Inode1<*>, args: LinkedList<String>, original: String): LocalDate =
         when (CommonUtil.popOrNull(args)) {
-            null -> throw TaskException("[$original] Builtin error: Arguments are empty")
+            null -> throw TaskException("[$original] Builtin error: Arguments are empty.")
             "filter" -> {
-                val ifTrue = parseDate(CommonUtil.popOrNull(args) ?: throw TaskException("[$original] Builtin error: Argument 'ifTrue' missing"), original)
-                val path = UnsafePath(CommonUtil.popOrNull(args) ?: throw TaskException("[$original] Builtin error: Argument 'path' missing"))
+                val ifTrue = parseDate(CommonUtil.popOrNull(args) ?: throw TaskException("""[$original] Builtin error: Argument "ifTrue" missing."""), original)
+                val path = UnsafePath(CommonUtil.popOrNull(args) ?: throw TaskException("""[$original] Builtin error: Argument "path" missing."""))
                 if (args.isNotEmpty()) {
                     throw TaskException("[$original] Builtin error: Too many arguments")
                 }
-                val inode = requestCtx.getInode(task.path.parent?.resolve(path) ?: throw TaskException("[$original] Builtin error: Path breaks out of jail"))
-                val system = inode.config.filter ?: throw TaskException("[$original] Builtin error: Path has no filter")
-                if (inode.path != system.ctx.output) {
-                    throw TaskException("[$original] Builtin error: Path is no filter output")
+                val inode = requestCtx.getInode(task.inode0.path.parent?.resolve(path) ?: throw TaskException("[$original] Builtin error: Path breaks out of jail."))
+                val system = inode.config.filter ?: throw TaskException("[$original] Builtin error: Path has no filter.")
+                if (inode.inode0.path != system.ctx.output) {
+                    throw TaskException("[$original] Builtin error: Path is no filter output.")
                 }
                 if (system.requiresAction(requestCtx) { throw TaskException(it) }) ifTrue else maxDate
             }
 
             "non_empty" -> {
-                val ifTrue = parseDate(CommonUtil.popOrNull(args) ?: throw TaskException("[$original] Builtin error: Argument 'ifTrue' missing"), original)
-                val path = UnsafePath(CommonUtil.popOrNull(args) ?: throw TaskException("[$original] Builtin error: Argument 'path' missing"))
+                val ifTrue = parseDate(CommonUtil.popOrNull(args) ?: throw TaskException("""[$original] Builtin error: Argument "ifTrue" missing."""), original)
+                val path = UnsafePath(CommonUtil.popOrNull(args) ?: throw TaskException("""[$original] Builtin error: Argument "path" missing."""))
                 if (args.isNotEmpty()) {
-                    throw TaskException("[$original] Builtin error: Too many arguments")
+                    throw TaskException("[$original] Builtin error: Too many arguments.")
                 }
-                val inode = requestCtx.getInode(task.path.parent?.resolve(path) ?: throw TaskException("[$original] Builtin error: Path breaks out of jail"))
+                val inode = requestCtx.getInode(task.inode0.path.parent?.resolve(path) ?: throw TaskException("[$original] Builtin error: Path breaks out of jail."))
                 when {
-                    inode.contentPermission.canFileGet -> if (inode.sizeFile > 0) ifTrue else maxDate
-                    inode.contentPermission.canDirectoryGet -> if (inode.children.isNotEmpty()) ifTrue else maxDate
-                    else -> throw TaskException("[$original] Builtin error: Neither file nor directory or insufficient permissions")
+                    inode.inode0.contentPermission.canFileGet -> if (inode.inode0.sizeOfFile > 0) ifTrue else maxDate
+                    inode.inode0.contentPermission.canDirectoryGet -> if (inode.inode0.sizeOfDirectory > 0) ifTrue else maxDate
+                    else -> throw TaskException("[$original] Builtin error: Neither file nor directory or insufficient permissions.")
                 }
             }
 
-            else -> throw TaskException("[$original] Builtin error: No builtin found")
+            else -> throw TaskException("[$original] Builtin error: No builtin found.")
         }
 
     class ParseErrorListener(private val input: String) : BaseErrorListener() {
@@ -144,7 +143,7 @@ object TaskUtil {
             msg: String?,
             e: RecognitionException?
         ) {
-            throw TaskException("[$input] Syntax error: $line:$charPositionInLine:$msg")
+            throw TaskException("[$input] Syntax error at $line:$charPositionInLine: $msg")
         }
     }
 

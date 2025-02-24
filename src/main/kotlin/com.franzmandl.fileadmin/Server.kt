@@ -1,7 +1,7 @@
 package com.franzmandl.fileadmin
 
-import com.franzmandl.fileadmin.generated.GitInfo
-import com.franzmandl.fileadmin.security.PasswordEncrypter
+import com.franzmandl.fileadmin.common.VersionInfo
+import com.franzmandl.fileadmin.config.PasswordEncrypter
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import kotlin.system.exitProcess
@@ -9,10 +9,8 @@ import kotlin.system.exitProcess
 @SpringBootApplication
 class Server {
     companion object {
-        private val version = "branch=${GitInfo.branch} shortHash=${GitInfo.shortHash} tags=[${GitInfo.tags.joinToString(",")}]"
-
         fun initAndRunApplication(args: Array<String>) {
-            runApplication<Server>(*args) { setBanner { _, _, out -> out.println("FileAdmin $version") } }
+            runApplication<Server>(*args) { setBanner { _, _, out -> out.println(VersionInfo.banner) } }
         }
     }
 }
@@ -26,7 +24,7 @@ fun main(args: Array<String>) {
             "password" -> PasswordEncrypter.main(actionArgs)
             "service" -> Server.initAndRunApplication(actionArgs)
             else -> {
-                System.err.println("[ERROR] not an action '$action'")
+                System.err.println("""[ERROR] not an action "$action".""")
                 exitProcess(1)
             }
         }

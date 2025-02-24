@@ -1,6 +1,0 @@
-{
-  "_type": "NewInodeVersion1",
-  "condition": {"_type": "ConditionVersion1", "minDepth": 1, "maxDepth": 1},
-  "isFile": false,
-  "name": "<nowDay> - <cursor>.txt"
-}

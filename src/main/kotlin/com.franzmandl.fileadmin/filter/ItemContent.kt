@@ -1,49 +1,67 @@
 package com.franzmandl.fileadmin.filter
 
-import com.franzmandl.fileadmin.common.CommonUtil
+import com.franzmandl.fileadmin.common.ErrorHandler
 import com.franzmandl.fileadmin.common.HttpException
-import com.franzmandl.fileadmin.model.config.ConditionVersion1
-import com.franzmandl.fileadmin.vfs.Inode
+import com.franzmandl.fileadmin.vfs.Inode1
+import com.franzmandl.fileadmin.vfs.PathCondition
 import com.franzmandl.fileadmin.vfs.PathFinder
 
 object ItemContent {
     interface Visitor {
-        val condition: ConditionVersion1
-        val onError: (String) -> Unit
+        val condition: PathCondition
+        val errorHandler: ErrorHandler
         val pruneNames: Set<String>
-        fun onDirectory(inode: Inode): Boolean
-        fun onFile(inode: Inode): Boolean
-        fun onName(inode: Inode): Boolean
+        fun onDirectory(inode: Inode1<*>): Boolean
+        fun onFile(inode: Inode1<*>): Boolean
+        fun onName(inode: Inode1<*>): Boolean
     }
 
-    fun visit(ctx: PathFinder.Ctx, inode: Inode, visitor: Visitor) {
-        visitInode(inode, visitor)
-        if (inode.contentOperation.canDirectoryGet) {
-            for (descendant in CommonUtil.getSequenceOfDescendants(ctx, inode, visitor.condition.defaultMinDepth - 1, visitor.condition.defaultMaxDepth - 1, visitor.pruneNames, visitor.onError)) {
-                if(!visitor.onName(descendant)) {
+    fun visit(ctx: PathFinder.Ctx, rootInode: Inode1<*>, visitor: Visitor) {
+        for (inode in visitor.condition.getSequenceOfDescendants(
+            ctx, rootInode,
+            PathCondition.Parameter(createPayload = PathCondition.Parameter.createNullPayload, evaluatePatterns = false, errorHandler = visitor.errorHandler, rootPayload = null),
+        )) {
+            if (visitor.condition.isContentPruned(inode.inode1.inode0.path.name)) {
+                continue
+            }
+            val component = inode.component
+            if (component == null) {
+                // inode is the root.
+                val commonResult = visitor.condition.rootPatterns.common.evaluatePessimistic(inode.inode1.inode0.path)
+                visitInode(
+                    inode.inode1, visitor,
+                    directoryResult = commonResult || visitor.condition.rootPatterns.directory.evaluatePessimistic(inode.inode1.inode0.path),
+                    fileResult = commonResult || visitor.condition.rootPatterns.file.evaluatePessimistic(inode.inode1.inode0.path)
+                )
+            } else {
+                if (!visitor.onName(inode.inode1)) {
                     return
                 }
-                visitInode(descendant, visitor)
+                val commonResult = component.patterns.common.evaluatePessimistic(inode.inode1.inode0.path)
+                visitInode(
+                    inode.inode1, visitor,
+                    directoryResult = commonResult || component.patterns.directory.evaluatePessimistic(inode.inode1.inode0.path),
+                    fileResult = commonResult || component.patterns.file.evaluatePessimistic(inode.inode1.inode0.path),
+                )
             }
         }
     }
 
-    private fun visitInode(inode: Inode, visitor: Visitor) {
+    private fun visitInode(inode: Inode1<*>, visitor: Visitor, directoryResult: Boolean, fileResult: Boolean) {
         try {
-            val commonCondition = visitor.condition.commonCondition.evaluate(inode.path)
             when {
-                inode.contentOperation.canFileGet && (commonCondition || visitor.condition.fileCondition.evaluate(inode.path)) ->
-                    if(!visitor.onFile(inode)) {
+                fileResult && inode.inode0.contentOperation.canFileGet ->
+                    if (!visitor.onFile(inode)) {
                         return
                     }
 
-                inode.contentOperation.canDirectoryGet && (commonCondition || visitor.condition.directoryCondition.evaluate(inode.path)) ->
-                    if(!visitor.onDirectory(inode)) {
+                directoryResult && inode.inode0.contentOperation.canDirectoryGet ->
+                    if (!visitor.onDirectory(inode)) {
                         return
                     }
             }
         } catch (e: HttpException) {
-            visitor.onError(e.message)
+            visitor.errorHandler.onError(e.message)
         }
     }
 }

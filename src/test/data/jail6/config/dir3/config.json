@@ -1,0 +1,6 @@
+{
+  "_type": "NewInodeVersion1",
+  "condition": {"_type": "SimplePathConditionVersion1"},
+  "isFile": true,
+  "name": "name from dir3"
+}

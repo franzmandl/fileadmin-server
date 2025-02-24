@@ -1,0 +1,80 @@
+{
+  "_type": "FilterVersion1",
+  "input": [
+    {"_type": "InputVersion1", "path": "input1",
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "withoutEnding", "suggestMinimumLength": 8, "template": {"_type": "TagVersion1", "name": "$1"}},
+        {"_type": "InodeTagPartVersion1", "index": 1, "pattern": "withoutEnding", "suggestMinimumLength": 8, "template": {"_type": "TagVersion1", "name": "$1"}},
+      null]},
+      "condition": {"_type": "PathConditionVersion1", "components": [
+        {"_type": "PathComponentVersion1", "time": true, "yield": true}
+      ], "finalComponent": {"_type": "FinalPathComponentVersion1", "fileNameGlob": "*"}}
+    },
+    {"_type": "InputVersion1", "path": "input2",
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "standard", "template": {"_type": "TagVersion1", "name": "Prefix$1"}},
+        {"_type": "InodeTagPartVersion1", "index": 1, "pattern": "^(.*?) \\((\\d{4})\\)$", "prependParent": false, "template": {"_type": "TagVersion1", "name": "$1  Year$2"}},
+      null]},
+      "condition": {"_type": "PathConditionVersion1", "components": [
+        {"_type": "PathComponentVersion1", "nameRegex": "^[^.]"},
+        {"_type": "PathComponentVersion1"}
+      ]}
+    },
+    {"_type": "InputVersion1", "path": "input3", "scanNameForTags": false, "scanParentPathForTags": false,
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "standard", "template": {"_type": "TagVersion1", "name": "Prefix$1"}},
+        {"_type": "InodeTagPartVersion1", "index": 1, "pattern": "withoutEnding", "prependParent": false, "template": {"_type": "TagVersion1", "name": "$1"}},
+      null]},
+      "condition": {"_type": "PathConditionVersion1", "components": [
+        {"_type": "PathComponentVersion1", "nameRegex": "^[^.]"}
+      ], "finalComponent": {"_type": "FinalPathComponentVersion1", "fileNameGlob": "*"}}
+    },
+    {"_type": "InputVersion1", "path": "input4",
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "standard", "suggestNameReplacement": "$1_", "template": {"_type": "TagVersion1", "name": "$1  Suffix"}},
+        {"_type": "InodeTagPartVersion1", "index": 1, "pattern": "standard", "template": {"_type": "TagVersion1", "name": "$1"}},
+        {"_type": "InodeTagPartVersion1", "index": 2, "pattern": "withoutEnding", "template": {"_type": "TagVersion1", "name": "$1"}},
+      null]},
+      "condition": {"_type": "PathConditionVersion1", "components": [
+        {"_type": "PathComponentVersion1", "nameRegex": "^[^.]"},
+        {"_type": "PathComponentVersion1"},
+        {"_type": "PathComponentVersion1", "directoryNameGlob": ""}
+      ]}
+    },
+    {"_type": "InputVersion1", "path": "input5",
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "standard", "suggestNameReplacement": "$1_", "template": {"_type": "TagVersion1", "name": "$1  Suffix"}},
+        {"_type": "InodeTagPartVersion1", "index": 1, "pattern": "withoutEnding", "template": {"_type": "TagVersion1", "name": "$1"}},
+      null]},
+      "condition": {"_type": "PathConditionVersion1", "components": [
+        {"_type": "PathComponentVersion1", "whitelist": ["Ghi", "Jkl"]},
+        {"_type": "PathComponentVersion1"}
+      ]}
+    },
+    {"_type": "InputVersion1", "path": "input5m",
+      "inodeTag": {"_type": "InodeTagVersion1", "parts": [
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "^(?:.*?)#((?:\\p{L}+|\\d+[\\p{L}_])[\\p{L}\\d_]*?)(_[\\p{L}\\d]+)?(?:\\.[^.]{2,})?$", "checkReplacement": false, "suggestNameReplacement": "$1_", "template": {"_type": "TagVersion1", "name": "$1 $2", "placeholder": true}},
+        {"_type": "InodeTagPartVersion1", "index": 0, "pattern": "^(.*?)(?:#(?:\\p{L}+|\\d+[\\p{L}_])[\\p{L}\\d_]*?(?:_[\\p{L}\\d]+)?)?(?:\\.[^.]{2,})?$", "template": {"_type": "TagVersion1", "name": "$1"}},
+      null]},
+      "condition": {"_type": "SimplePathConditionVersion1", "time": true}
+    },
+    {"_type": "InputVersion1", "path": "input6",
+      "condition": {"_type": "PathConditionVersion1", "finalComponent": {"_type": "FinalPathComponentVersion1", "nameRegex": "#(?:\\p{L}+|\\d+[\\p{L}_])"}}
+    }
+  ],
+  "output": {
+    "_type": "OutputDirectoryVersion1",
+    "path": "tags"
+  },
+  "tags": [
+    {"_type": "TagVersion1", "name": "#Def_Suffix"},
+    {"_type": "TagVersion1", "name": "#Ghi_Suffix", "placeholder": true},
+    {"_type": "TagVersion1", "name": "#TagA"},
+    {"_type": "TagVersion1", "name": "#TagB"},
+    {"_type": "TagVersion1", "name": "#TagC_Input5mPrefix"},
+    {"_type": "TagVersion1", "name": "#TagD_ef_Input5mPrefix"},
+    {"_type": "TagVersion1", "name": "#TagE"},
+    {"_type": "TagVersion1", "name": "#TagF_Input5mPrefix"},
+    {"_type": "TagVersion1", "name": "#TagG"},
+  null]
+}

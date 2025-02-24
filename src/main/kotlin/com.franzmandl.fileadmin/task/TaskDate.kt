@@ -3,7 +3,7 @@ package com.franzmandl.fileadmin.task
 import com.franzmandl.fileadmin.common.CommonUtil
 import com.franzmandl.fileadmin.common.HttpException
 import com.franzmandl.fileadmin.generated.task.TaskParser.*
-import com.franzmandl.fileadmin.vfs.Inode
+import com.franzmandl.fileadmin.vfs.Inode1
 import com.franzmandl.fileadmin.vfs.Link
 import com.franzmandl.fileadmin.vfs.NativeInode
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -11,12 +11,12 @@ import java.time.LocalDate
 import java.util.*
 
 class TaskDate(
-    val taskCtx: TaskCtx,
-    val inode: Inode,
+    val taskDateCtx: TaskDateCtx,
+    val inode: Inode1<*>,
     val tree: StartContext,
     private val callers: MutableSet<TaskDate>,
 ) {
-    private val mutableArgs = HashMap<ExprTriggerContext, List<Arg>>()
+    private val mutableArgs = mutableMapOf<ExprTriggerContext, List<Arg>>()
     val args: Map<ExprTriggerContext, List<Arg>> = mutableArgs
     val date: LocalDate
     val fileEnding: String = tree.FILE_ENDING().text
@@ -26,7 +26,7 @@ class TaskDate(
         private set
     var isWaiting = false
         private set
-    var priority = 0
+    var priority: Int? = null
         private set
     var usesExpression = false
         private set
@@ -38,15 +38,7 @@ class TaskDate(
         date = visitStart(tree)
     }
 
-    fun getLastModified() = inode.lastModified?.let { CommonUtil.convertToLocalDate(it) }
-
-    fun canHandleStatus(status: String) = status != TaskUtil.doneStatus || !isRepeating || canRepeat
-
-    fun getStatusPath(status: String) =
-        if (isRepeating && status == TaskUtil.doneStatus)
-            TaskDoneName(this).name
-        else
-            "../$status/${tree.text}"
+    fun getLastModified() = inode.inode0.lastModified?.let { CommonUtil.convertToLocalDate(it) }
 
     private fun visitStart(ctx: StartContext) = visitTrigger(ctx.trigger(), true)
 
@@ -78,7 +70,7 @@ class TaskDate(
             )
 
             ctx.nestedTrigger() != null -> TriggerResult(visitTrigger(ctx.nestedTrigger().trigger(), isFirstLevel))
-            else -> throw IllegalStateException()
+            else -> error("")
         }
         isRepeating = isRepeating || (isFirstLevel && result.repeatCtx != null)
         if (isFirstLevel && result.priorityCtx != null) {
@@ -97,11 +89,11 @@ class TaskDate(
                 "bin" -> {
                     val original = ctx.args().text
                     val args = visitExprTriggerArgs(ctx.args())
-                    val firstArg = args.firstOrNull() ?: throw TaskException("[$original] Binary error: Arguments are empty")
+                    val firstArg = args.firstOrNull() ?: throw TaskException("[$original] Binary error: Arguments are empty.")
                     if (firstArg !is StringArg) {
-                        throw TaskException("[$original] Binary error: Placeholder not allowed as first argument")
+                        throw TaskException("[$original] Binary error: Placeholder not allowed as first argument.")
                     }
-                    args[0] = StringArg(taskCtx.prepareBinary(firstArg.value, original))
+                    args[0] = StringArg(taskDateCtx.prepareBinary(firstArg.value, original))
                     mutableArgs[ctx] = args
                     TaskUtil.parseDate(TaskUtil.visitExprTriggerBin(TaskUtil.parseArguments(args, null), original), original)
                 }
@@ -109,7 +101,7 @@ class TaskDate(
                 "builtin" -> {
                     val args = visitExprTriggerArgs(ctx.args())
                     mutableArgs[ctx] = args
-                    TaskUtil.visitExprTriggerBuiltin(taskCtx.request, inode, TaskUtil.parseArguments(args, null), ctx.args().text)
+                    TaskUtil.visitExprTriggerBuiltin(taskDateCtx.request, inode, TaskUtil.parseArguments(args, null), ctx.args().text)
                 }
 
                 "id" -> {
@@ -118,11 +110,11 @@ class TaskDate(
 
                 "now" -> {
                     visitZeroArgs(ctx.args(), ctx.id().text)
-                    taskCtx.request.now
+                    taskDateCtx.request.now
                 }
 
                 "ref" -> {
-                    taskCtx.registry.getById(TaskUtil.visitIntArg(ctx.args())[0], this, callers)
+                    taskDateCtx.getById(TaskUtil.visitStringArg(ctx.args())[0], this, callers)
                 }
 
                 "waiting" -> {
@@ -130,13 +122,13 @@ class TaskDate(
                     TaskUtil.maxDate
                 }
 
-                else -> throw TaskException("[${ctx.text}] Semantic error: Illegal expression '${ctx.id().text}'")
+                else -> throw TaskException("""[${ctx.text}] Semantic error: Illegal expression "${ctx.id().text}".""")
             }, ctx.effective(), ctx.priority(), ctx.repeat()
         )
     }
 
     private fun visitZeroArgs(ctx: ArgsContext?, expression: String) = ctx?.arg()?.forEach { _ ->
-        throw TaskException("[${ctx.text}] Semantic error: $expression does not accept arguments")
+        throw TaskException("""[${ctx.text}] Semantic error: "$expression" does not accept arguments.""")
     }
 
     private fun visitExprTriggerArgs(ctx: ArgsContext?): MutableList<Arg> {
@@ -146,7 +138,7 @@ class TaskDate(
                 argCtx.QUOTED_STRING() != null -> StringArg(visitQuotedString(argCtx.QUOTED_STRING()))
                 argCtx.string() != null -> StringArg(argCtx.string().text)
                 argCtx.trigger() != null -> visitTriggerArg(argCtx.trigger())
-                else -> throw IllegalStateException()
+                else -> error("")
             }
         } ?: LinkedList()
     }
@@ -172,15 +164,15 @@ class TaskDate(
 
             "target" -> StringArg(
                 when {
-                    inode is Link -> inode.target.toString()
-                    inode is NativeInode && inode.isLink -> inode.linkTarget.toString()
+                    inode.inode0 is Link -> inode.inode0.target.toString()
+                    inode.inode0 is NativeInode && inode.inode0.isLink -> inode.inode0.linkTarget.toString()
                     else -> throw TaskException("[${ctx.text}] Semantic error: Inode is neither a link nor a native symbolic link.")
                 }
             )
 
             "task" -> StringArg(
-                when (inode) {
-                    is NativeInode -> inode.publicLocalPath.toString()
+                when (inode.inode0) {
+                    is NativeInode -> inode.inode0.publicLocalPath.toString()
                     else -> throw TaskException("[${ctx.text}] Semantic error: Inode must be native.")
                 }
             )
@@ -192,17 +184,17 @@ class TaskDate(
 
     private fun visitLineArg(ctx: ArgsContext): StringArg {
         if (ctx.arg(0) == null || ctx.arg(1) != null) {
-            throw TaskException("[${ctx.text}] Semantic error: line accepts exactly one argument")
+            throw TaskException("[${ctx.text}] Semantic error: line accepts exactly one argument.")
         }
         val lineIndex = TaskUtil.parseInt(ctx.arg(0).string().text) - 1
         val lines = lines ?: try {
-            inode.lines
+            inode.inode0.lines
         } catch (e: HttpException) {
             throw TaskException("[${ctx.text}] Semantic error: ${e.message}")
         }
         this.lines = lines
         if (lineIndex >= lines.size) {
-            throw TaskException("[${ctx.text}] Semantic error: Inode only has ${lines.size} lines, not ${lineIndex + 1}")
+            throw TaskException("[${ctx.text}] Semantic error: Inode only has ${lines.size} lines, not ${lineIndex + 1}.")
         }
         return StringArg(lines[lineIndex])
     }

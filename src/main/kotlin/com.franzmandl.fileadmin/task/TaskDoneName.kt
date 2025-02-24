@@ -28,15 +28,15 @@ class TaskDoneName(
             ctx.and != null -> visitBinary(ctx, ctx.and)
             ctx.or != null -> visitBinary(ctx, ctx.or)
             ctx.nestedTrigger() != null -> visitNestedTrigger(ctx.nestedTrigger())
-            else -> throw IllegalStateException()
+            else -> error("")
         }
     }
 
     private fun visitDateTrigger(ctx: DateTriggerContext) {
         val period = TaskUtil.visitRepeat(ctx.repeat())
         val force = ctx.repeat()?.exclm != null
-        val date = if (force) TaskUtil.parseDate(ctx.DATE().text, ctx.DATE().text) else taskDate.taskCtx.request.now
-        if ((taskDate.usesOperators && date > taskDate.taskCtx.request.now) || (force && period == Period.ZERO)) {
+        val date = if (force) TaskUtil.parseDate(ctx.DATE().text, ctx.DATE().text) else taskDate.taskDateCtx.request.now
+        if ((taskDate.usesOperators && date > taskDate.taskDateCtx.request.now) || (force && period == Period.ZERO)) {
             stringBuilder.append(ctx.DATE().text)
         } else {
             stringBuilder.append("${date + period}")
@@ -48,15 +48,15 @@ class TaskDoneName(
         when (ctx.id().text) {
             "bin" -> {
                 val period = TaskUtil.visitRepeat(ctx.repeat())
-                val args = taskDate.args[ctx] ?: throw IllegalStateException()
+                val args = taskDate.args[ctx] ?: error("")
                 stringBuilder.append(TaskUtil.visitExprTriggerBin(TaskUtil.parseArguments(args, period), ctx.args().text))
                 appendTimeEffectiveRepeat(ctx.time(), ctx.effective(), ctx.priority(), ctx.repeat())
             }
 
             "builtin" -> {
                 val period = TaskUtil.visitRepeat(ctx.repeat())
-                val args = taskDate.args[ctx] ?: throw IllegalStateException()
-                stringBuilder.append(TaskUtil.visitExprTriggerBuiltin(taskDate.taskCtx.request, taskDate.inode, TaskUtil.parseArguments(args, period), ctx.args().text))
+                val args = taskDate.args[ctx] ?: error("")
+                stringBuilder.append(TaskUtil.visitExprTriggerBuiltin(taskDate.taskDateCtx.request, taskDate.inode, TaskUtil.parseArguments(args, period), ctx.args().text))
                 appendTimeEffectiveRepeat(ctx.time(), ctx.effective(), ctx.priority(), ctx.repeat())
             }
 
